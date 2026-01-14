@@ -1,0 +1,613 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USUARIOS Y AUTENTICACIÓN
+// ============================================
+
+enum UserRole {
+  ADMIN
+  VENDEDOR
+  VISUALIZADOR
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          UserRole  @default(VENDEDOR)
+  isActive      Boolean   @default(true)
+  avatar        String?
+  
+  // Relaciones
+  sales         Sale[]
+  activities    Activity[]
+  campaigns     Campaign[]
+  notifications Notification[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("users")
+}
+
+// ============================================
+// CLIENTES (CRM)
+// ============================================
+
+enum ClientType {
+  NATURAL      // Persona natural
+  JURIDICO     // Empresa/Persona jurídica
+}
+
+enum ClientCategory {
+  NUEVO
+  REGULAR
+  VIP
+  MAYORISTA
+  INACTIVO
+}
+
+model Client {
+  id              String          @id @default(uuid())
+  
+  // Información básica
+  clientType      ClientType
+  
+  // Para persona natural
+  firstName       String?
+  lastName        String?
+  
+  // Para persona jurídica
+  companyName     String?
+  rif             String?         @unique
+  
+  // Común para ambos
+  email           String?
+  phone           String
+  address         String          // Solo una dirección
+  city            String?
+  state           String?
+  
+  // Categorización
+  category        ClientCategory  @default(NUEVO)
+  
+  // Fidelización (sin canje, solo tracking)
+  loyaltyPoints   Int             @default(0)
+  totalPurchases  Decimal         @default(0) @db.Decimal(12, 2)
+  purchaseCount   Int             @default(0)
+  
+  // Metadata
+  notes           String?
+  isActive        Boolean         @default(true)
+  
+  // Relaciones
+  sales           Sale[]
+  specialOrders   SpecialOrder[]
+  activities      Activity[]
+  scoring         ClientScoring?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  lastPurchaseAt  DateTime?
+
+  @@map("clients")
+}
+
+// ============================================
+// SCORING DE CLIENTES (IA)
+// ============================================
+
+model ClientScoring {
+  id                    String    @id @default(uuid())
+  clientId              String    @unique
+  client                Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  // Puntuación general (0-100)
+  score                 Int       @default(0)
+  
+  // Factores de scoring
+  purchaseFrequency     Int       @default(0)  // Frecuencia de compra
+  averageTicket         Decimal   @default(0) @db.Decimal(12, 2)
+  daysSinceLastPurchase Int       @default(0)
+  lifetimeValue         Decimal   @default(0) @db.Decimal(12, 2)
+  
+  // Predicciones IA
+  churnProbability      Decimal   @default(0) @db.Decimal(5, 2) // 0-100%
+  nextPurchaseDays      Int?      // Días estimados hasta próxima compra
+  
+  // Recomendaciones
+  recommendedProducts   String[]  // IDs de productos recomendados
+  
+  updatedAt             DateTime  @updatedAt
+
+  @@map("client_scoring")
+}
+
+// ============================================
+// PRODUCTOS E INVENTARIO
+// ============================================
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  icon        String?   // Nombre del icono de Lucide
+  isActive    Boolean   @default(true)
+  
+  products    Product[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id              String    @id @default(uuid())
+  
+  // Información básica
+  name            String
+  description     String?
+  sku             String    @unique  // Código interno
+  barcode         String?   @unique  // Código de barras
+  
+  // Categorización
+  categoryId      String
+  category        Category  @relation(fields: [categoryId], references: [id])
+  
+  // Precios
+  costPrice       Decimal   @db.Decimal(12, 2)  // Precio de costo
+  salePrice       Decimal   @db.Decimal(12, 2)  // Precio de venta regular
+  wholesalePrice  Decimal?  @db.Decimal(12, 2)  // Precio mayorista
+  
+  // Inventario
+  currentStock    Int       @default(0)
+  minStock        Int       @default(5)          // Stock mínimo antes de alerta
+  maxStock        Int?                           // Stock máximo recomendado
+  
+  // Variantes
+  hasVariants     Boolean   @default(false)
+  parentProductId String?                        // Si es variante, apunta al producto padre
+  parentProduct   Product?  @relation("ProductVariants", fields: [parentProductId], references: [id])
+  variants        Product[] @relation("ProductVariants")
+  variantInfo     String?                        // ej: "1L", "4L", "Rojo"
+  
+  // Metadata
+  image           String?
+  unit            String    @default("unidad")   // unidad, litro, kg, etc.
+  isActive        Boolean   @default(true)
+  
+  // Relaciones
+  saleItems       SaleItem[]
+  specialOrders   SpecialOrder[]
+  productSuppliers ProductSupplier[]
+  inventoryMovements InventoryMovement[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("products")
+}
+
+// ============================================
+// PROVEEDORES
+// ============================================
+
+model Supplier {
+  id              String    @id @default(uuid())
+  
+  name            String
+  rif             String?   @unique
+  email           String?
+  phone           String
+  address         String?
+  city            String?
+  
+  // Contacto
+  contactName     String?
+  contactPhone    String?
+  
+  // Evaluación
+  rating          Decimal?  @db.Decimal(3, 2)  // 0-5 estrellas
+  notes           String?
+  isActive        Boolean   @default(true)
+  
+  // Relaciones
+  productSuppliers ProductSupplier[]
+  purchaseOrders   PurchaseOrder[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("suppliers")
+}
+
+// Relación muchos a muchos entre Productos y Proveedores
+model ProductSupplier {
+  id              String    @id @default(uuid())
+  
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  supplierId      String
+  supplier        Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  // Precio de este proveedor para este producto
+  supplierPrice   Decimal   @db.Decimal(12, 2)
+  
+  // Tiempos de entrega
+  leadTimeDays    Int?      // Días de entrega estimados
+  
+  // Preferencia
+  isPreferred     Boolean   @default(false)  // Proveedor preferido para este producto
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([productId, supplierId])
+  @@map("product_suppliers")
+}
+
+// ============================================
+// VENTAS
+// ============================================
+
+enum PaymentMethod {
+  EFECTIVO
+  TRANSFERENCIA
+  PUNTO_VENTA
+  PAGO_MOVIL
+  ZELLE
+}
+
+model Sale {
+  id              String        @id @default(uuid())
+  
+  // Información de venta
+  saleNumber      String        @unique  // Número de factura
+  
+  // Cliente
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+  
+  // Vendedor
+  sellerId        String
+  seller          User          @relation(fields: [sellerId], references: [id])
+  
+  // Montos
+  subtotal        Decimal       @db.Decimal(12, 2)
+  discount        Decimal       @default(0) @db.Decimal(12, 2)
+  tax             Decimal       @default(0) @db.Decimal(12, 2)
+  total           Decimal       @db.Decimal(12, 2)
+  
+  // Pago
+  paymentMethod   PaymentMethod
+  
+  // Metadata
+  notes           String?
+  
+  // Relaciones
+  items           SaleItem[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id              String    @id @default(uuid())
+  
+  saleId          String
+  sale            Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
+  
+  quantity        Int
+  unitPrice       Decimal   @db.Decimal(12, 2)  // Precio al momento de la venta
+  subtotal        Decimal   @db.Decimal(12, 2)  // quantity * unitPrice
+  
+  createdAt       DateTime  @default(now())
+
+  @@map("sale_items")
+}
+
+// ============================================
+// PEDIDOS ESPECIALES
+// ============================================
+
+enum OrderStatus {
+  PENDIENTE
+  ORDEN_GENERADA
+  EN_TRANSITO
+  RECIBIDO
+  LISTO_CLIENTE
+  ENTREGADO
+  CANCELADO
+}
+
+model SpecialOrder {
+  id              String        @id @default(uuid())
+  orderNumber     String        @unique
+  
+  // Cliente
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id])
+  
+  // Producto (SOLO UNO)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  
+  // Estado
+  status          OrderStatus   @default(PENDIENTE)
+  
+  // Tracking
+  estimatedDate   DateTime?     // Fecha estimada de llegada
+  receivedDate    DateTime?     // Fecha real de recepción
+  notifiedAt      DateTime?     // Cuándo se notificó al cliente
+  
+  // Relación con orden de compra
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  
+  // Metadata
+  notes           String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("special_orders")
+}
+
+// ============================================
+// ÓRDENES DE COMPRA A PROVEEDORES
+// ============================================
+
+enum PurchaseOrderStatus {
+  BORRADOR
+  ENVIADA
+  CONFIRMADA
+  RECIBIDA_PARCIAL
+  RECIBIDA_COMPLETA
+  CANCELADA
+}
+
+model PurchaseOrder {
+  id              String              @id @default(uuid())
+  orderNumber     String              @unique
+  
+  // Proveedor
+  supplierId      String
+  supplier        Supplier            @relation(fields: [supplierId], references: [id])
+  
+  // Estado
+  status          PurchaseOrderStatus @default(BORRADOR)
+  
+  // Montos
+  subtotal        Decimal             @db.Decimal(12, 2)
+  tax             Decimal             @default(0) @db.Decimal(12, 2)
+  total           Decimal             @db.Decimal(12, 2)
+  
+  // Fechas
+  orderDate       DateTime            @default(now())
+  expectedDate    DateTime?
+  receivedDate    DateTime?
+  
+  // Metadata
+  notes           String?
+  
+  // Relaciones
+  items           PurchaseOrderItem[]
+  specialOrders   SpecialOrder[]
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  
+  productId       String
+  // No relation directa con Product para evitar problemas si se elimina
+  productName     String        // Guardamos el nombre por si acaso
+  productSku      String
+  
+  quantity        Int
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  subtotal        Decimal       @db.Decimal(12, 2)
+  
+  quantityReceived Int          @default(0)
+  
+  createdAt       DateTime      @default(now())
+
+  @@map("purchase_order_items")
+}
+
+// ============================================
+// MOVIMIENTOS DE INVENTARIO
+// ============================================
+
+enum MovementType {
+  ENTRADA          // Compra a proveedor
+  SALIDA           // Venta
+  AJUSTE_POSITIVO  // Ajuste manual +
+  AJUSTE_NEGATIVO  // Ajuste manual -
+  DEVOLUCION       // Devolución de cliente
+}
+
+model InventoryMovement {
+  id          String        @id @default(uuid())
+  
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  
+  type        MovementType
+  quantity    Int           // Cantidad (positiva o negativa)
+  
+  // Stock antes y después del movimiento
+  stockBefore Int
+  stockAfter  Int
+  
+  // Referencia (opcional)
+  reference   String?       // ID de venta, compra, etc.
+  notes       String?
+  
+  createdBy   String?       // Usuario que realizó el movimiento
+  createdAt   DateTime      @default(now())
+
+  @@map("inventory_movements")
+}
+
+// ============================================
+// CAMPAÑAS DE MARKETING
+// ============================================
+
+enum CampaignType {
+  EMAIL
+  WHATSAPP
+  PROMOCION
+  DESCUENTO
+}
+
+enum CampaignStatus {
+  BORRADOR
+  PROGRAMADA
+  EN_PROCESO
+  COMPLETADA
+  CANCELADA
+}
+
+model Campaign {
+  id          String          @id @default(uuid())
+  
+  name        String
+  description String?
+  type        CampaignType
+  status      CampaignStatus  @default(BORRADOR)
+  
+  // Contenido
+  subject     String?         // Para emails
+  message     String          // Mensaje del contenido
+  
+  // Segmentación (guardamos IDs de clientes)
+  targetClients String[]      // Array de IDs
+  
+  // Estadísticas
+  sentCount   Int             @default(0)
+  openCount   Int             @default(0)
+  clickCount  Int             @default(0)
+  
+  // Fechas
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  
+  // Creador
+  createdById String
+  createdBy   User            @relation(fields: [createdById], references: [id])
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("campaigns")
+}
+
+// ============================================
+// ACTIVIDADES CRM
+// ============================================
+
+enum ActivityType {
+  LLAMADA
+  EMAIL
+  REUNION
+  NOTA
+  TAREA
+  SEGUIMIENTO
+}
+
+enum ActivityStatus {
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+}
+
+model Activity {
+  id          String          @id @default(uuid())
+  
+  type        ActivityType
+  status      ActivityStatus  @default(PENDIENTE)
+  
+  // Información
+  subject     String
+  description String?
+  
+  // Relación con cliente
+  clientId    String
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  // Asignación
+  assignedToId String
+  assignedTo   User           @relation(fields: [assignedToId], references: [id])
+  
+  // Fechas
+  dueDate     DateTime?
+  completedAt DateTime?
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("activities")
+}
+
+// ============================================
+// NOTIFICACIONES
+// ============================================
+
+enum NotificationType {
+  PEDIDO_LISTO
+  STOCK_BAJO
+  NUEVO_CLIENTE
+  VENTA_COMPLETADA
+  SISTEMA
+}
+
+model Notification {
+  id          String            @id @default(uuid())
+  
+  type        NotificationType
+  title       String
+  message     String
+  
+  // Destinatario
+  userId      String?
+  user        User?             @relation(fields: [userId], references: [id])
+  
+  // Estado
+  isRead      Boolean           @default(false)
+  readAt      DateTime?
+  
+  // Metadata
+  metadata    Json?             // Datos adicionales en JSON
+  
+  createdAt   DateTime          @default(now())
+
+  @@map("notifications")
+}
