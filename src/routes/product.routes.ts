@@ -10,7 +10,6 @@ import { authenticate, requireRole } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
 router.use(authenticate);
 
 // GET /api/products/stats

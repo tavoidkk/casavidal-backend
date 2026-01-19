@@ -5,10 +5,8 @@ import { authenticate, requireRole } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
 router.use(authenticate);
-
-// GET /api/clients/stats - Estadísticas
+// GET /api/clients/stats - Estadisticas
 router.get('/stats', ClientController.getStats);
 
 // GET /api/clients/vip - Clientes VIP
