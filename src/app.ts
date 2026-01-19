@@ -4,8 +4,11 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
 import { errorHandler, notFound } from './middleware/errorHandler';
+
+// Rutas
 import authRoutes from './routes/auth.routes';
 import clientRoutes from './routes/client.routes';
+import productRoutes from './routes/product.routes';
 
 const app = express();
 
@@ -40,7 +43,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
-
+app.use('/api/products', productRoutes);
 
 // Error handling
 app.use(notFound);
