@@ -61,7 +61,9 @@ export class ClientController {
         search: req.query.search as string,
         category: req.query.category as any,
         clientType: req.query.clientType as any,
-        isActive: req.query.isActive === 'true',
+         isActive: req.query.isActive !== undefined 
+        ? req.query.isActive === 'true' 
+        : undefined,
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 10,
       };

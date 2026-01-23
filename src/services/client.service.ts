@@ -53,7 +53,7 @@ export class ClientService {
       search,
       category,
       clientType,
-      isActive,
+      isActive = undefined,
       page = 1,
       limit = 10,
     } = filters;
