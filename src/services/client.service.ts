@@ -5,14 +5,25 @@ import { Prisma } from '@prisma/client';
 
 export class ClientService {
   // Crear cliente
-  static async create(data: CreateClientInput) {
-    // Validar que tenga los datos según el tipo
-    if (data.clientType === 'NATURAL' && (!data.firstName || !data.lastName)) {
-      throw new AppError(400, 'Nombre y apellido son requeridos para persona natural');
-    }
+static async create(data: CreateClientInput) {
+  // Si viene docNumber, construir document
+  if (data.docNumber && data.docPrefix) {
+    data.document = `${data.docPrefix}${data.docNumber}${data.docCheck || ''}`.replace(/-/g, '');
+  }
 
-    if (data.clientType === 'JURIDICO' && !data.companyName) {
-      throw new AppError(400, 'Razón social es requerida para persona jurídica');
+  // Validar que tenga los datos según el tipo
+  if (data.clientType === 'NATURAL' && (!data.firstName || !data.lastName)) {
+    throw new AppError(400, 'Nombre y apellido son requeridos para persona natural');
+  }
+
+    // Verificar documento duplicado solo si viene
+    if (data.document) {
+      const existingDocument = await prisma.client.findUnique({
+        where: { document: data.document },
+      });
+      if (existingDocument) {
+        throw new AppError(409, 'Ya existe un cliente con esta cédula');
+      }
     }
 
     // Verificar RIF duplicado si es jurídico
@@ -25,10 +36,11 @@ export class ClientService {
       }
     }
 
+    const { docPrefix, docNumber, docCheck, ...clientData } = data;
     // Crear cliente
     const client = await prisma.client.create({
       data: {
-        ...data,
+        ...clientData,
         category: data.category || 'NUEVO',
       },
       include: {
@@ -40,7 +52,7 @@ export class ClientService {
     await prisma.clientScoring.create({
       data: {
         clientId: client.id,
-        score: 50, // Score neutral inicial
+        score: 50,
       },
     });
 
@@ -53,7 +65,7 @@ export class ClientService {
       search,
       category,
       clientType,
-      isActive = undefined,
+      isActive,
       page = 1,
       limit = 10,
     } = filters;
@@ -98,7 +110,7 @@ export class ClientService {
           },
         },
         orderBy: [
-          { category: 'asc' }, // VIP primero
+          { category: 'asc' },
           { lastPurchaseAt: 'desc' },
         ],
         skip: (page - 1) * limit,
@@ -165,8 +177,25 @@ export class ClientService {
 
   // Actualizar cliente
   static async update(id: string, data: UpdateClientInput) {
-    // Verificar que existe
     await this.findById(id);
+
+     // Si viene docNumber, construir document
+    if (data.docNumber && data.docPrefix) {
+      data.document = `${data.docPrefix}${data.docNumber}${data.docCheck || ''}`.replace(/-/g, '');
+    }
+
+    // Verificar cédula duplicada si se está actualizando
+    if (data.document) {
+      const existingDocument = await prisma.client.findFirst({
+        where: {
+          document: data.document,
+          NOT: { id },
+        },
+      });
+      if (existingDocument) {
+        throw new AppError(409, 'Ya existe un cliente con esta cédula');
+      }
+    }
 
     // Verificar RIF duplicado si se está actualizando
     if (data.rif) {
@@ -181,9 +210,11 @@ export class ClientService {
       }
     }
 
+    const { docPrefix, docNumber, docCheck, ...updateData } = data;
+
     const client = await prisma.client.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         scoring: true,
       },
@@ -248,7 +279,7 @@ export class ClientService {
         isActive: true,
         scoring: {
           churnProbability: {
-            gte: 70, // >= 70% de probabilidad de churn
+            gte: 70,
           },
         },
       },

@@ -9,13 +9,17 @@ export const createClientSchema = z.object({
     clientType: z.enum(['NATURAL', 'JURIDICO']),
     firstName: z.string().min(2).max(50).optional(),
     lastName: z.string().min(2).max(50).optional(),
+    document: z.string().optional(),
+    docPrefix: z.string().optional(),
+    docNumber: z.string().optional(),
+    docCheck: z.string().optional(),
     companyName: z.string().min(2).max(100).optional(),
-    rif: z.string().regex(/^[JVG]-?\d{8,9}-?\d?$/).optional(),
+    rif: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().min(10).max(20),
     address: z.string().min(5).max(200),
-    city: z.string().min(2).max(50).optional(),
-    state: z.string().min(2).max(50).optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
     category: z.enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO']).optional(),
     notes: z.string().max(500).optional(),
   }),
@@ -25,13 +29,17 @@ export const updateClientSchema = z.object({
   body: z.object({
     firstName: z.string().min(2).max(50).optional(),
     lastName: z.string().min(2).max(50).optional(),
+    document: z.string().optional(),
+    docPrefix: z.string().optional(),
+    docNumber: z.string().optional(),
+    docCheck: z.string().optional(),
     companyName: z.string().min(2).max(100).optional(),
-    rif: z.string().regex(/^[JVG]-?\d{8,9}-?\d?$/).optional(),
+    rif: z.string().optional(),
     email: z.string().email().optional(),
     phone: z.string().min(10).max(20).optional(),
     address: z.string().min(5).max(200).optional(),
-    city: z.string().min(2).max(50).optional(),
-    state: z.string().min(2).max(50).optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
     category: z.enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO']).optional(),
     notes: z.string().max(500).optional(),
     isActive: z.boolean().optional(),
@@ -42,6 +50,7 @@ export class ClientController {
   // POST /api/clients
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('📥 Datos recibidos:', req.body);
       const client = await ClientService.create(req.body);
       return successResponse(
         res,
@@ -50,6 +59,7 @@ export class ClientController {
         201
       );
     } catch (error) {
+      console.error('❌ ERROR AL CREAR:', error);
       next(error);
     }
   }
@@ -61,9 +71,9 @@ export class ClientController {
         search: req.query.search as string,
         category: req.query.category as any,
         clientType: req.query.clientType as any,
-         isActive: req.query.isActive !== undefined 
-        ? req.query.isActive === 'true' 
-        : undefined,
+        isActive: req.query.isActive !== undefined 
+          ? req.query.isActive === 'true' 
+          : undefined,
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 10,
       };
@@ -95,6 +105,7 @@ export class ClientController {
   // PUT /api/clients/:id
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
+      console.log('📥 Datos para actualizar:', req.body);
       const client = await ClientService.update(req.params.id, req.body);
       return successResponse(res, client, 'Cliente actualizado exitosamente');
     } catch (error) {

@@ -4,6 +4,10 @@ export interface CreateClientInput {
   clientType: ClientType;
   firstName?: string;
   lastName?: string;
+  document?: string;
+  docPrefix?: string;
+  docNumber?: string;
+  docCheck?: string;       
   companyName?: string;
   rif?: string;
   email?: string;
@@ -18,6 +22,10 @@ export interface CreateClientInput {
 export interface UpdateClientInput {
   firstName?: string;
   lastName?: string;
+  document?: string;
+  docPrefix?: string;
+  docNumber?: string;
+  docCheck?: string;  
   companyName?: string;
   rif?: string;
   email?: string;

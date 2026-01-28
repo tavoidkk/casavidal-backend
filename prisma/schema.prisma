@@ -66,6 +66,7 @@ model Client {
   clientType      ClientType
   
   // Para persona natural
+  document        String?         @unique 
   firstName       String?
   lastName        String?
   
