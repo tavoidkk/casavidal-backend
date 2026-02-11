@@ -1,27 +1,26 @@
-import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { NextFunction, Request, Response } from 'express';
+import { ZodError, AnyZodObject } from 'zod';
 
-export const validate = (schema: AnyZodObject) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
+export const validate =
+  (schema: AnyZodObject) =>
+  (req: Request, res: Response, next: NextFunction) => {
     try {
-      await schema.parseAsync({
+      schema.parse({
         body: req.body,
         query: req.query,
         params: req.params,
       });
-      next();
+      return next();
     } catch (error) {
       if (error instanceof ZodError) {
+        console.error('❌ ZOD ERROR:', JSON.stringify(error.errors, null, 2));
         return res.status(400).json({
-          success: false,
-          error: 'Error de validación',
-          details: error.issues.map((e) => ({
-            field: e.path.join('.'),
-            message: e.message,
-          })),
+          message: 'Validation error',
+          errors: error.errors,
         });
       }
-      next(error);
+
+      console.error('❌ VALIDATION ERROR:', error);
+      return res.status(400).json({ message: 'Validation error' });
     }
   };
-};

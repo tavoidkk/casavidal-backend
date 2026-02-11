@@ -5,52 +5,123 @@ import { z } from 'zod';
 
 // Schemas de validación
 export const createClientSchema = z.object({
-  body: z.object({
-    clientType: z.enum(['NATURAL', 'JURIDICO']),
-    firstName: z.string().min(2).max(50).optional(),
-    lastName: z.string().min(2).max(50).optional(),
-    document: z.string().optional(),
-    docPrefix: z.string().optional(),
-    docNumber: z.string().optional(),
-    docCheck: z.string().optional(),
-    companyName: z.string().min(2).max(100).optional(),
-    rif: z.string().optional(),
-    email: z.string().email().optional(),
-    phone: z.string().min(10).max(20),
-    address: z.string().min(5).max(200),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    category: z.enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO']).optional(),
-    notes: z.string().max(500).optional(),
-  }),
+  body: z
+    .object({
+      // tipo de cliente
+      clientType: z.enum(['NATURAL', 'JURIDICO']),
+
+      // datos personales / empresa
+      firstName: z.string().optional().nullable(),
+      lastName: z.string().optional().nullable(),
+      companyName: z.string().optional().nullable(), 
+
+      // documento (como lo manda el front)
+      docPrefix: z.string().optional().nullable(),
+      docNumber: z.string().optional().nullable(),
+      docCheck: z.string().optional().nullable(),
+      document: z.string().optional().nullable(),
+      rif: z.string().optional().nullable(),
+
+      email: z.string().email().optional().nullable().or(z.literal('')),
+      phone: z.string().min(7).max(20), // requerido
+      address: z.string().min(5).max(200), // requerido
+
+      city: z.string().optional().nullable(),
+      state: z.string().optional().nullable(),
+
+      category: z
+        .enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO'])
+        .optional()
+        .nullable(),
+
+      notes: z.string().max(500).optional().nullable(),
+    })
+    .passthrough()
+    .superRefine((data, ctx) => {
+      // Validación condicional: companyName obligatorio para JURIDICO
+      if (data.clientType === 'JURIDICO') {
+        if (!data.companyName || data.companyName.trim().length < 2) {
+          ctx.addIssue({
+            path: ['companyName'],
+            code: 'too_small',
+            type: 'string',
+            minimum: 2,
+            inclusive: true,
+            message: 'La razón social es obligatoria para clientes jurídicos',
+          });
+        }
+      }
+
+      // Validación condicional: firstName/lastName obligatorios para NATURAL
+      if (data.clientType === 'NATURAL') {
+        if (!data.firstName || data.firstName.trim().length < 2) {
+          ctx.addIssue({
+            path: ['firstName'],
+            code: 'too_small',
+            type: 'string',
+            minimum: 2,
+            inclusive: true,
+            message: 'El nombre es obligatorio para persona natural',
+          });
+        }
+        if (!data.lastName || data.lastName.trim().length < 2) {
+          ctx.addIssue({
+            path: ['lastName'],
+            code: 'too_small',
+            type: 'string',
+            minimum: 2,
+            inclusive: true,
+            message: 'El apellido es obligatorio para persona natural',
+          });
+        }
+      }
+    }),
 });
+
 
 export const updateClientSchema = z.object({
   body: z.object({
-    firstName: z.string().min(2).max(50).optional(),
-    lastName: z.string().min(2).max(50).optional(),
-    document: z.string().optional(),
-    docPrefix: z.string().optional(),
-    docNumber: z.string().optional(),
-    docCheck: z.string().optional(),
-    companyName: z.string().min(2).max(100).optional(),
-    rif: z.string().optional(),
-    email: z.string().email().optional(),
-    phone: z.string().min(10).max(20).optional(),
-    address: z.string().min(5).max(200).optional(),
-    city: z.string().optional(),
-    state: z.string().optional(),
-    category: z.enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO']).optional(),
-    notes: z.string().max(500).optional(),
-    isActive: z.boolean().optional(),
-  }),
+    clientType: z.enum(['NATURAL', 'JURIDICO']).optional(),
+
+    firstName: z.string().min(2).max(50).optional().nullable(),
+    lastName: z.string().min(2).max(50).optional().nullable(),
+    companyName: z.string().min(2).max(100).optional().nullable().or(z.literal('')),
+
+    docPrefix: z.string().optional().nullable(),
+    docNumber: z.string().optional().nullable(),
+    docCheck: z.string().optional().nullable(),
+    document: z.string().optional().nullable(),
+
+    rif: z.string().optional().nullable(),
+
+    email: z
+      .string()
+      .email()
+      .optional()
+      .nullable()
+      .or(z.literal('')),
+
+    phone: z.string().min(7).max(20).optional().nullable(),
+    address: z.string().min(5).max(200).optional().nullable(),
+
+    city: z.string().optional().nullable(),
+    state: z.string().optional().nullable(),
+
+    category: z
+      .enum(['NUEVO', 'REGULAR', 'VIP', 'MAYORISTA', 'INACTIVO'])
+      .optional()
+      .nullable(),
+
+    notes: z.string().max(500).optional().nullable(),
+    isActive: z.boolean().optional().nullable(),
+  }).passthrough(),
 });
 
 export class ClientController {
   // POST /api/clients
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('📥 Datos recibidos:', req.body);
+      //console.log('Datos recibidos:', req.body);
       const client = await ClientService.create(req.body);
       return successResponse(
         res,
@@ -59,7 +130,7 @@ export class ClientController {
         201
       );
     } catch (error) {
-      console.error('❌ ERROR AL CREAR:', error);
+      //console.error('ERROR AL CREAR:', error);
       next(error);
     }
   }
@@ -105,7 +176,7 @@ export class ClientController {
   // PUT /api/clients/:id
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
-      console.log('📥 Datos para actualizar:', req.body);
+      //console.log('Datos para actualizar:', req.body);
       const client = await ClientService.update(req.params.id, req.body);
       return successResponse(res, client, 'Cliente actualizado exitosamente');
     } catch (error) {
