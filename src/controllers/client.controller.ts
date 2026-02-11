@@ -78,7 +78,6 @@ export const createClientSchema = z.object({
     }),
 });
 
-
 export const updateClientSchema = z.object({
   body: z.object({
     clientType: z.enum(['NATURAL', 'JURIDICO']).optional(),

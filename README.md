@@ -119,4 +119,4 @@ Proyecto de tesis - URBE 2025
 
 ## 👥 Autores
 
-- [GUSTAVO VIDAL]
+- [GUSTAVO VIDAL only]
