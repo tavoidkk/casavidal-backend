@@ -10,6 +10,9 @@ import authRoutes from './routes/auth.routes';
 import clientRoutes from './routes/client.routes';
 import productRoutes from './routes/product.routes';
 import categoryRoutes from './routes/category.routes';
+import saleRoutes from './routes/sale.routes';
+import specialOrderRoutes from './routes/specialOrder.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 const app = express();
 
@@ -46,6 +49,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/sales', saleRoutes);
+app.use('/api/special-orders', specialOrderRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Error handling
 app.use(notFound);
