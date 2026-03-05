@@ -1,5 +1,5 @@
-process.env.DATABASE_URL='postgresql://neondb_owner:npg_cNitCvon7x6k@ep-morning-brook-ah88v5rs-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
-process.env.NODE_ENV='development';
+import { config } from 'dotenv';
+config();
 const ws = require('ws');
 const { neonConfig, Pool } = require('@neondatabase/serverless');
 const { PrismaNeon } = require('@prisma/adapter-neon');
