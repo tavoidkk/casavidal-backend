@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { CreateSaleInput, SaleFilters } from '../types/sale.types';
 import { Prisma } from '@prisma/client';
+import { ActivityService } from './activity.service';
 
 export class SaleService {
   // Genera número de venta: VTA-20250101-00001
@@ -180,6 +181,62 @@ export class SaleService {
 
       return newSale;
     });
+
+    // Actividad automática de seguimiento post-venta
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 3);
+    await ActivityService.createActivity({
+      clientId: data.clientId,
+      assignedToId: sellerId,
+      type: 'SEGUIMIENTO',
+      subject: `Seguimiento post-venta ${sale.saleNumber}`,
+      description: 'Contactar al cliente para validar su experiencia con la compra.',
+      dueDate,
+    });
+
+    const productNames = sale.items.map((item) => item.product.name.toLowerCase());
+
+    // Seguimiento especial para productos de instalación (ej. bombas)
+    if (productNames.some((name) => name.includes('bomba'))) {
+      const due = new Date();
+      due.setDate(due.getDate() + 5);
+      await ActivityService.createActivity({
+        clientId: data.clientId,
+        assignedToId: sellerId,
+        type: 'LLAMADA',
+        subject: 'Seguimiento de instalación de bomba',
+        description: 'Validar instalación, fugas, presión y funcionamiento general con el cliente.',
+        dueDate: due,
+      });
+    }
+
+    // Herramientas eléctricas: revisión rápida de experiencia
+    if (productNames.some((name) => ['taladro', 'amoladora', 'esmeril', 'sierra'].some((k) => name.includes(k)))) {
+      const due = new Date();
+      due.setDate(due.getDate() + 2);
+      await ActivityService.createActivity({
+        clientId: data.clientId,
+        assignedToId: sellerId,
+        type: 'SEGUIMIENTO',
+        subject: 'Seguimiento de herramienta eléctrica',
+        description: 'Consultar desempeño y dudas de uso seguro del equipo.',
+        dueDate: due,
+      });
+    }
+
+    // Pinturas/acabados: oferta de complementarios
+    if (productNames.some((name) => ['pintura', 'esmalte', 'barniz'].some((k) => name.includes(k)))) {
+      const due = new Date();
+      due.setDate(due.getDate() + 4);
+      await ActivityService.createActivity({
+        clientId: data.clientId,
+        assignedToId: sellerId,
+        type: 'EMAIL',
+        subject: 'Seguimiento de acabados y complementarios',
+        description: 'Ofrecer selladores, brochas y repuestos según consumo del cliente.',
+        dueDate: due,
+      });
+    }
 
     return sale;
   }

@@ -34,3 +34,5 @@ logs/
 
 # Test scripts with potential secrets
 test-db.mjs
+
+hola.js

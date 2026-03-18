@@ -3,7 +3,8 @@ import {
   ProductController, 
   createProductSchema, 
   updateProductSchema,
-  adjustStockSchema 
+  adjustStockSchema,
+  upsertSupplierSchema,
 } from '../controllers/product.controller';
 import { validate } from '../middleware/validation.middleware';
 import { authenticate, requireRole } from '../middleware/authMiddleware';
@@ -68,6 +69,21 @@ router.delete(
   '/:id',
   requireRole('ADMIN'),
   ProductController.delete
+);
+
+// POST /api/products/:id/supplier - Vincular proveedor
+router.post(
+  '/:id/supplier',
+  requireRole('ADMIN', 'VENDEDOR'),
+  validate(upsertSupplierSchema),
+  ProductController.upsertSupplier
+);
+
+// DELETE /api/products/:id/supplier/:supplierId - Desvincular proveedor
+router.delete(
+  '/:id/supplier/:supplierId',
+  requireRole('ADMIN'),
+  ProductController.removeSupplier
 );
 
 export default router;

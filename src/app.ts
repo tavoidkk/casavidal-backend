@@ -13,6 +13,9 @@ import categoryRoutes from './routes/category.routes';
 import saleRoutes from './routes/sale.routes';
 import specialOrderRoutes from './routes/specialOrder.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import supplierRoutes from './routes/supplier.routes';
+import notificationRoutes from './routes/notification.routes';
+import activityRoutes from './routes/activity.routes';
 
 const app = express();
 
@@ -52,6 +55,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/special-orders', specialOrderRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/activities', activityRoutes);
 
 // Error handling
 app.use(notFound);

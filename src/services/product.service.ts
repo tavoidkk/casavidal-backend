@@ -420,19 +420,56 @@ export class ProductService {
 
   // Productos más vendidos (preparado para cuando tengamos ventas)
   static async getTopSelling(limit = 10) {
-    // Por ahora retorna productos ordenados por nombre
-    // Cuando tengamos módulo de ventas, ordenaremos por cantidad vendida
     const products = await prisma.product.findMany({
       where: { isActive: true },
-      include: {
-        category: true,
-      },
+      include: { category: true },
       take: limit,
-      orderBy: {
-        name: 'asc',
-      },
+      orderBy: { name: 'asc' },
     });
-
     return products;
+  }
+
+  static async upsertSupplier(
+    productId: string,
+    data: { supplierId: string; supplierPrice: number; isPreferred?: boolean }
+  ) {
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product || !product.isActive) throw new AppError(404, 'Producto no encontrado');
+
+    const supplier = await prisma.supplier.findUnique({ where: { id: data.supplierId } });
+    if (!supplier || !supplier.isActive) throw new AppError(404, 'Proveedor no encontrado');
+
+    // Si se marca como preferido, desmarcar el anterior
+    if (data.isPreferred) {
+      await prisma.productSupplier.updateMany({
+        where: { productId, isPreferred: true },
+        data: { isPreferred: false },
+      });
+    }
+
+    return prisma.productSupplier.upsert({
+      where: { productId_supplierId: { productId, supplierId: data.supplierId } },
+      create: {
+        productId,
+        supplierId: data.supplierId,
+        supplierPrice: data.supplierPrice,
+        isPreferred: data.isPreferred ?? false,
+      },
+      update: {
+        supplierPrice: data.supplierPrice,
+        isPreferred: data.isPreferred ?? false,
+      },
+      include: { supplier: { select: { id: true, name: true, rif: true } } },
+    });
+  }
+
+  static async removeSupplier(productId: string, supplierId: string) {
+    const ps = await prisma.productSupplier.findUnique({
+      where: { productId_supplierId: { productId, supplierId } },
+    });
+    if (!ps) throw new AppError(404, 'Relación producto-proveedor no encontrada');
+    return prisma.productSupplier.delete({
+      where: { productId_supplierId: { productId, supplierId } },
+    });
   }
 }

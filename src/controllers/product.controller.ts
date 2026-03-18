@@ -54,6 +54,14 @@ export const adjustStockSchema = z.object({
   }),
 });
 
+export const upsertSupplierSchema = z.object({
+  body: z.object({
+    supplierId: z.string().uuid(),
+    supplierPrice: z.number().positive(),
+    isPreferred: z.boolean().optional(),
+  }),
+});
+
 export class ProductController {
   // POST /api/products
   static async create(req: Request, res: Response, next: NextFunction) {
@@ -207,6 +215,26 @@ export class ProductController {
       const limit = parseInt(req.query.limit as string) || 10;
       const products = await ProductService.getTopSelling(limit);
       return successResponse(res, products);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/products/:id/supplier
+  static async upsertSupplier(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await ProductService.upsertSupplier(req.params.id, req.body);
+      return successResponse(res, result, 'Proveedor vinculado exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // DELETE /api/products/:id/supplier/:supplierId
+  static async removeSupplier(req: Request, res: Response, next: NextFunction) {
+    try {
+      await ProductService.removeSupplier(req.params.id, req.params.supplierId);
+      return successResponse(res, null, 'Proveedor desvinculado');
     } catch (error) {
       next(error);
     }
