@@ -615,3 +615,41 @@ model Notification {
 
   @@map("notifications")
 }
+
+// ============================================
+// CONFIGURACIÓN DEL SISTEMA
+// ============================================
+
+model Settings {
+  id                  String   @id @default(uuid())
+  
+  // Información de la empresa
+  companyName         String   @default("Casa Vidal")
+  companyEmail        String?
+  companyPhone        String?
+  companyAddress      String?
+  companyLogo         String?  // URL o base64 del logo
+  
+  // Configuración financiera
+  currency            String   @default("CLP")      // CLP, USD, EUR, etc.
+  taxRate             Decimal  @default(19.00) @db.Decimal(5, 2)  // % de IVA
+  
+  // Configuración de inventario
+  lowStockThreshold   Int      @default(10)         // Umbral para alerta de stock bajo
+  
+  // Configuración de ventas
+  defaultPaymentTerm  Int      @default(30)         // Días de plazo de pago por defecto
+  
+  // Configuración de sistema
+  enableNotifications Boolean  @default(true)       // Activar/desactivar notificaciones
+  enableAutoBackup    Boolean  @default(false)      // Activar respaldos automáticos
+  
+  // Localización
+  locale              String   @default("es-CL")    // es-CL, en-US, etc.
+  timezone            String   @default("America/Santiago")
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("settings")
+}

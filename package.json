@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "npx tsx prisma/seed.ts",
     "test": "vitest",
     "test:fuzz": "vitest run tests/fuzz",
     "test:watch": "vitest watch",

@@ -16,6 +16,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import supplierRoutes from './routes/supplier.routes';
 import notificationRoutes from './routes/notification.routes';
 import activityRoutes from './routes/activity.routes';
+import settingsRoutes from './routes/settings.routes';
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/activities', activityRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Error handling
 app.use(notFound);
