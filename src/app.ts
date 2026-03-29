@@ -17,6 +17,7 @@ import supplierRoutes from './routes/supplier.routes';
 import notificationRoutes from './routes/notification.routes';
 import activityRoutes from './routes/activity.routes';
 import settingsRoutes from './routes/settings.routes';
+import excelRoutes from './routes/excel.routes';
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/excel', excelRoutes);
 
 // Error handling
 app.use(notFound);
