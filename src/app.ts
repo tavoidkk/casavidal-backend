@@ -18,6 +18,7 @@ import notificationRoutes from './routes/notification.routes';
 import activityRoutes from './routes/activity.routes';
 import settingsRoutes from './routes/settings.routes';
 import excelRoutes from './routes/excel.routes';
+import recommendationRoutes from './routes/recommendation.routes';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/excel', excelRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 // Error handling
 app.use(notFound);
