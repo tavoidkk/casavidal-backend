@@ -1,4 +1,4 @@
-import { ClientType, ClientCategory } from '@prisma/client';
+import { ClientType, ClientCategory, ClientStage, ClientSource } from '@prisma/client';
 
 export interface CreateClientInput {
   clientType: ClientType;
@@ -16,6 +16,9 @@ export interface CreateClientInput {
   city?: string;
   state?: string;
   category?: ClientCategory;
+  stage?: ClientStage;
+  source?: ClientSource;
+  lastContactAt?: Date;
   notes?: string;
 }
 
@@ -34,6 +37,9 @@ export interface UpdateClientInput {
   city?: string;
   state?: string;
   category?: ClientCategory;
+  stage?: ClientStage;
+  source?: ClientSource;
+  lastContactAt?: Date;
   notes?: string;
   isActive?: boolean;
 }
@@ -42,6 +48,8 @@ export interface ClientFilters {
   search?: string;
   category?: ClientCategory;
   clientType?: ClientType;
+  stage?: ClientStage;
+  source?: ClientSource;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -56,6 +64,9 @@ export interface ClientWithScoring {
   email?: string;
   phone: string;
   category: ClientCategory;
+  stage: ClientStage;
+  source?: ClientSource;
+  lastContactAt?: Date;
   loyaltyPoints: number;
   totalPurchases: number;
   purchaseCount: number;

@@ -34,6 +34,18 @@ export const createClientSchema = z.object({
         .optional()
         .nullable(),
 
+      stage: z
+        .enum(['NUEVO', 'CONTACTADO', 'COTIZACION', 'GANADO', 'PERDIDO'])
+        .optional()
+        .nullable(),
+
+      source: z
+        .enum(['REFERIDO', 'REDES', 'WHATSAPP', 'VISITA', 'OTRO'])
+        .optional()
+        .nullable(),
+
+      lastContactAt: z.string().datetime().optional().nullable().or(z.literal('')),
+
       notes: z.string().max(500).optional().nullable(),
     })
     .passthrough()
@@ -111,6 +123,18 @@ export const updateClientSchema = z.object({
       .optional()
       .nullable(),
 
+    stage: z
+      .enum(['NUEVO', 'CONTACTADO', 'COTIZACION', 'GANADO', 'PERDIDO'])
+      .optional()
+      .nullable(),
+
+    source: z
+      .enum(['REFERIDO', 'REDES', 'WHATSAPP', 'VISITA', 'OTRO'])
+      .optional()
+      .nullable(),
+
+    lastContactAt: z.string().datetime().optional().nullable().or(z.literal('')),
+
     notes: z.string().max(500).optional().nullable(),
     isActive: z.boolean().optional().nullable(),
   }).passthrough(),
@@ -121,7 +145,11 @@ export class ClientController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
       //console.log('Datos recibidos:', req.body);
-      const client = await ClientService.create(req.body);
+      const payload = {
+        ...req.body,
+        lastContactAt: req.body.lastContactAt ? new Date(req.body.lastContactAt) : undefined,
+      };
+      const client = await ClientService.create(payload);
       return successResponse(
         res,
         client,
@@ -141,6 +169,8 @@ export class ClientController {
         search: req.query.search as string,
         category: req.query.category as any,
         clientType: req.query.clientType as any,
+        stage: req.query.stage as any,
+        source: req.query.source as any,
         isActive: req.query.isActive !== undefined 
           ? req.query.isActive === 'true' 
           : undefined,
@@ -176,7 +206,11 @@ export class ClientController {
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
       //console.log('Datos para actualizar:', req.body);
-      const client = await ClientService.update(req.params.id, req.body);
+      const payload = {
+        ...req.body,
+        lastContactAt: req.body.lastContactAt ? new Date(req.body.lastContactAt) : undefined,
+      };
+      const client = await ClientService.update(req.params.id, payload);
       return successResponse(res, client, 'Cliente actualizado exitosamente');
     } catch (error) {
       next(error);

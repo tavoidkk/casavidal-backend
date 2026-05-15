@@ -62,6 +62,22 @@ enum ClientCategory {
   INACTIVO
 }
 
+enum ClientStage {
+  NUEVO
+  CONTACTADO
+  COTIZACION
+  GANADO
+  PERDIDO
+}
+
+enum ClientSource {
+  REFERIDO
+  REDES
+  WHATSAPP
+  VISITA
+  OTRO
+}
+
 model Client {
   id              String          @id @default(uuid())
   
@@ -86,6 +102,11 @@ model Client {
   
   // Categorización
   category        ClientCategory  @default(NUEVO)
+
+  // Prospectos y pipeline
+  stage           ClientStage     @default(NUEVO)
+  source          ClientSource?
+  lastContactAt   DateTime?
   
   // Fidelización (sin canje, solo tracking)
   loyaltyPoints   Int             @default(0)
