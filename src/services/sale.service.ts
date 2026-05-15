@@ -146,6 +146,8 @@ export class SaleService {
         newCategory = 'REGULAR';
       }
 
+      const newStage = client.purchaseCount === 0 ? 'GANADO' : undefined;
+
       await tx.client.update({
         where: { id: data.clientId },
         data: {
@@ -154,6 +156,7 @@ export class SaleService {
           loyaltyPoints: newLoyaltyPoints,
           lastPurchaseAt: new Date(),
           category: newCategory,
+          ...(newStage ? { stage: newStage } : {}),
         },
       });
 

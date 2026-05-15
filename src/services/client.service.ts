@@ -65,6 +65,8 @@ static async create(data: CreateClientInput) {
       search,
       category,
       clientType,
+      stage,
+      source,
       isActive,
       page = 1,
       limit = 10,
@@ -76,6 +78,8 @@ static async create(data: CreateClientInput) {
         isActive !== undefined ? { isActive } : {},
         category ? { category } : {},
         clientType ? { clientType } : {},
+        stage ? { stage } : {},
+        source ? { source } : {},
         search
           ? {
               OR: [
