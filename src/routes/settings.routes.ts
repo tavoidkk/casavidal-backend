@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { SettingsController, settingsSchemas } from '../controllers/settings.controller';
 import { authenticate, requireRole } from '../middleware/authMiddleware';
 import { validate } from '../middleware/validation.middleware';
+import { uploadSettingsLogo } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -58,6 +59,18 @@ router.post(
   '/import',
   requireRole('ADMIN'),
   SettingsController.importData
+);
+
+/**
+ * POST /api/settings/logo
+ * Subir logo de la compañía
+ * Solo ADMIN puede subir logo
+ */
+router.post(
+  '/logo',
+  requireRole('ADMIN'),
+  uploadSettingsLogo.single('logo'),
+  SettingsController.uploadLogo
 );
 
 export default router;

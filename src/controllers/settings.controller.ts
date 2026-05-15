@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { SettingsService } from '../services/settings.service';
 import { successResponse } from '../utils/response';
+import fs from 'fs';
+import path from 'path';
 
 // Esquema de validación para actualizar configuración
 const updateSettingsSchema = z.object({
@@ -17,13 +19,22 @@ const updateSettingsSchema = z.object({
     currency: z.enum(['CLP', 'USD', 'EUR', 'ARS', 'MXN', 'COP', 'PEN', 'BRL'], {
       errorMap: () => ({ message: 'Moneda no válida' })
     }).optional(),
-    taxRate: z.number().min(0, 'La tasa de impuesto no puede ser negativa').max(100, 'La tasa de impuesto no puede exceder 100%').optional(),
+    taxRate: z.preprocess(
+      (value) => (typeof value === 'string' && value !== '' ? Number(value) : value),
+      z.number().min(0, 'La tasa de impuesto no puede ser negativa').max(100, 'La tasa de impuesto no puede exceder 100%')
+    ).optional(),
     
     // Configuración de inventario
-    lowStockThreshold: z.number().int().min(0, 'El umbral de stock debe ser un número positivo').optional(),
+    lowStockThreshold: z.preprocess(
+      (value) => (typeof value === 'string' && value !== '' ? Number(value) : value),
+      z.number().int().min(0, 'El umbral de stock debe ser un número positivo')
+    ).optional(),
     
     // Configuración de ventas
-    defaultPaymentTerm: z.number().int().min(0, 'El plazo de pago debe ser un número positivo').optional(),
+    defaultPaymentTerm: z.preprocess(
+      (value) => (typeof value === 'string' && value !== '' ? Number(value) : value),
+      z.number().int().min(0, 'El plazo de pago debe ser un número positivo')
+    ).optional(),
     
     // Configuración de sistema
     enableNotifications: z.boolean().optional(),
@@ -105,6 +116,25 @@ export class SettingsController {
     try {
       const result = await SettingsService.importData(req.body);
       return successResponse(res, result, 'Datos importados exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/settings/logo
+   * Subir logo de la compañía
+   * Solo accesible por ADMIN
+   */
+  static async uploadLogo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, error: 'No se proporcionó ningún archivo' });
+      }
+
+      const logoUrl = `/uploads/settings/${file.filename}`;
+      return successResponse(res, { url: logoUrl }, 'Logo subido exitosamente');
     } catch (error) {
       next(error);
     }
