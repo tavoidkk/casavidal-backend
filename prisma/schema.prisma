@@ -21,6 +21,7 @@ enum UserRole {
   ADMIN
   VENDEDOR
   VISUALIZADOR
+  WORKER
 }
 
 model User {
@@ -36,6 +37,8 @@ model User {
   // Relaciones
   sales         Sale[]
   activities    Activity[]
+  calendarEvents CalendarEvent[]
+  googleCalendarToken GoogleCalendarToken?
   campaigns     Campaign[]
   notifications Notification[]
   
@@ -121,6 +124,7 @@ model Client {
   sales           Sale[]
   specialOrders   SpecialOrder[]
   activities      Activity[]
+  calendarEvents  CalendarEvent[]
   scoring         ClientScoring?
   
   createdAt       DateTime        @default(now())
@@ -574,6 +578,26 @@ enum ActivityStatus {
   CANCELADA
 }
 
+// ============================================
+// CALENDARIO
+// ============================================
+
+enum CalendarEventCategory {
+  TAREA
+  AGENDA
+}
+
+enum CalendarEventStatus {
+  PENDIENTE
+  COMPLETADA
+  CANCELADA
+}
+
+enum CalendarEventSource {
+  LOCAL
+  GOOGLE
+}
+
 model Activity {
   id          String          @id @default(uuid())
   
@@ -600,6 +624,86 @@ model Activity {
   updatedAt   DateTime        @updatedAt
 
   @@map("activities")
+}
+
+model EventType {
+  id                     String   @id @default(uuid())
+  name                   String   @unique
+  color                  String   @default("#2563eb")
+  defaultDurationMinutes Int      @default(30)
+  isActive               Boolean  @default(true)
+
+  calendarEvents         CalendarEvent[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("event_types")
+}
+
+model BookingSettings {
+  id              String   @id @default(uuid())
+  workDays        String[]
+  startTime       String
+  endTime         String
+  intervalMinutes Int      @default(30)
+  timezone        String   @default("America/Santiago")
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("booking_settings")
+}
+
+model CalendarEvent {
+  id            String               @id @default(uuid())
+  title         String
+  description   String?
+  category      CalendarEventCategory
+  status        CalendarEventStatus  @default(PENDIENTE)
+  source        CalendarEventSource  @default(LOCAL)
+
+  startDate     DateTime
+  endDate       DateTime
+  allDay        Boolean              @default(false)
+
+  clientId      String?
+  client        Client?              @relation(fields: [clientId], references: [id])
+
+  assignedToId  String
+  assignedTo    User                 @relation(fields: [assignedToId], references: [id])
+
+  eventTypeId   String?
+  eventType     EventType?           @relation(fields: [eventTypeId], references: [id])
+
+  location      String?
+  googleEventId String?
+
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([startDate, endDate])
+  @@index([assignedToId])
+  @@map("calendar_events")
+}
+
+model GoogleCalendarToken {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accessToken  String
+  refreshToken String
+  scope        String?
+  tokenType    String?
+  expiryDate   DateTime?
+  calendarId   String?
+  syncToken    String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("google_calendar_tokens")
 }
 
 // ============================================

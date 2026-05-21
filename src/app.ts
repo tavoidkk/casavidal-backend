@@ -20,6 +20,12 @@ import activityRoutes from './routes/activity.routes';
 import settingsRoutes from './routes/settings.routes';
 import excelRoutes from './routes/excel.routes';
 import recommendationRoutes from './routes/recommendation.routes';
+import workersRoutes from './routes/workers.routes';
+import eventTypesRoutes from './routes/eventTypes.routes';
+import bookingSettingsRoutes from './routes/bookingSettings.routes';
+import calendarEventsRoutes from './routes/calendarEvents.routes';
+import googleCalendarRoutes from './routes/googleCalendar.routes';
+import reportsRoutes from './routes/reports.routes';
 
 const app = express();
 
@@ -70,6 +76,12 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/workers', workersRoutes);
+app.use('/api/event-types', eventTypesRoutes);
+app.use('/api/booking-settings', bookingSettingsRoutes);
+app.use('/api/calendar-events', calendarEventsRoutes);
+app.use('/api/google-calendar', googleCalendarRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Error handling
 app.use(notFound);

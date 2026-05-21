@@ -19,7 +19,7 @@ export const registerSchema = z.object({
       .string()
       .min(2, 'El apellido debe tener al menos 2 caracteres')
       .max(20, 'El apellido es demasiado largo'),
-    role: z.enum(['ADMIN', 'VENDEDOR', 'VISUALIZADOR']).optional(),
+    role: z.enum(['ADMIN', 'VENDEDOR', 'VISUALIZADOR', 'WORKER']).optional(),
   }),
 });
 
