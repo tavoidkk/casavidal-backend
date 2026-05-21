@@ -20,6 +20,7 @@ import activityRoutes from './routes/activity.routes';
 import settingsRoutes from './routes/settings.routes';
 import excelRoutes from './routes/excel.routes';
 import recommendationRoutes from './routes/recommendation.routes';
+
 import workersRoutes from './routes/workers.routes';
 import eventTypesRoutes from './routes/eventTypes.routes';
 import bookingSettingsRoutes from './routes/bookingSettings.routes';

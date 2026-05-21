@@ -1,8 +1,10 @@
 import { prisma } from '../config/database';
 import { ActivityType } from '@prisma/client';
 
+const ONE_HOUR_MS = 3600000;
+
 export class ActivityService {
-  // Crear actividad
+  // Crear actividad + sincronizar con calendario si tiene fecha
   static async createActivity(data: {
     clientId: string;
     assignedToId: string;
@@ -11,32 +13,47 @@ export class ActivityService {
     description?: string;
     dueDate?: Date;
   }) {
-    return await prisma.activity.create({
-      data: {
-        clientId: data.clientId,
-        assignedToId: data.assignedToId,
-        type: data.type,
-        subject: data.subject,
-        description: data.description,
-        dueDate: data.dueDate,
-      },
-      include: {
-        assignedTo: {
-          select: {
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
+    return await prisma.$transaction(async (tx) => {
+      const activity = await tx.activity.create({
+        data: {
+          clientId: data.clientId,
+          assignedToId: data.assignedToId,
+          type: data.type,
+          subject: data.subject,
+          description: data.description,
+          dueDate: data.dueDate,
         },
-        client: {
-          select: {
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            clientType: true,
-          },
+        include: {
+          assignedTo: { select: { firstName: true, lastName: true, role: true } },
+          client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
         },
-      },
+      });
+
+      if (data.dueDate) {
+        const event = await tx.calendarEvent.create({
+          data: {
+            title: data.subject,
+            description: data.description,
+            category: 'TAREA',
+            status: 'PENDIENTE',
+            source: 'LOCAL',
+            startDate: data.dueDate,
+            endDate: new Date(data.dueDate.getTime() + ONE_HOUR_MS),
+            allDay: false,
+            clientId: data.clientId,
+            assignedToId: data.assignedToId,
+          },
+        });
+
+        await tx.activity.update({
+          where: { id: activity.id },
+          data: { calendarEventId: event.id },
+        });
+
+        activity.calendarEventId = event.id;
+      }
+
+      return activity;
     });
   }
 
@@ -45,13 +62,7 @@ export class ActivityService {
     return await prisma.activity.findMany({
       where: { clientId },
       include: {
-        assignedTo: {
-          select: {
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
+        assignedTo: { select: { firstName: true, lastName: true, role: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -62,14 +73,7 @@ export class ActivityService {
     return await prisma.activity.findMany({
       where: { assignedToId },
       include: {
-        client: {
-          select: {
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            clientType: true,
-          },
-        },
+        client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -89,7 +93,7 @@ export class ActivityService {
     if (filters?.type) where.type = filters.type;
     if (filters?.clientId) where.clientId = filters.clientId;
     if (filters?.assignedToId) where.assignedToId = filters.assignedToId;
-    
+
     if (filters?.startDate || filters?.endDate) {
       where.createdAt = {};
       if (filters.startDate) where.createdAt.gte = filters.startDate;
@@ -99,21 +103,8 @@ export class ActivityService {
     return await prisma.activity.findMany({
       where,
       include: {
-        assignedTo: {
-          select: {
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        client: {
-          select: {
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            clientType: true,
-          },
-        },
+        assignedTo: { select: { firstName: true, lastName: true, role: true } },
+        client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -124,29 +115,13 @@ export class ActivityService {
     return await prisma.activity.findUnique({
       where: { id },
       include: {
-        assignedTo: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-            role: true,
-          },
-        },
-        client: {
-          select: {
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            clientType: true,
-            email: true,
-            phone: true,
-          },
-        },
+        assignedTo: { select: { firstName: true, lastName: true, email: true, role: true } },
+        client: { select: { firstName: true, lastName: true, companyName: true, clientType: true, email: true, phone: true } },
       },
     });
   }
 
-  // Actualizar actividad
+  // Actualizar actividad + sincronizar calendario
   static async updateActivity(
     id: string,
     data: {
@@ -158,34 +133,78 @@ export class ActivityService {
       completedAt?: Date | null;
     }
   ) {
-    return await prisma.activity.update({
-      where: { id },
-      data,
-      include: {
-        assignedTo: {
-          select: {
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
+    return await prisma.$transaction(async (tx) => {
+      const activity = await tx.activity.findUnique({ where: { id }, select: { calendarEventId: true, dueDate: true, subject: true, description: true } });
+      if (!activity) throw new Error('Actividad no encontrada');
+
+      const updated = await tx.activity.update({
+        where: { id },
+        data,
+        include: {
+          assignedTo: { select: { firstName: true, lastName: true, role: true } },
+          client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
         },
-        client: {
-          select: {
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            clientType: true,
+      });
+
+      // Actualizar CalendarEvent si existe
+      if (activity.calendarEventId) {
+        const eventData: any = {};
+        if (data.subject !== undefined) eventData.title = data.subject;
+        if (data.description !== undefined) eventData.description = data.description;
+        if (data.status) eventData.status = data.status;
+        if (data.dueDate !== undefined) {
+          eventData.startDate = data.dueDate;
+          eventData.endDate = new Date(data.dueDate.getTime() + ONE_HOUR_MS);
+        }
+        if (Object.keys(eventData).length > 0) {
+          await tx.calendarEvent.update({
+            where: { id: activity.calendarEventId },
+            data: eventData,
+          });
+        }
+      }
+
+      // Si se agregó un dueDate a una actividad que no tenía, crear CalendarEvent
+      if (data.dueDate && !activity.calendarEventId) {
+        const event = await tx.calendarEvent.create({
+          data: {
+            title: updated.subject,
+            description: updated.description || undefined,
+            category: 'TAREA',
+            status: updated.status || 'PENDIENTE',
+            source: 'LOCAL',
+            startDate: data.dueDate,
+            endDate: new Date(data.dueDate.getTime() + ONE_HOUR_MS),
+            allDay: false,
+            clientId: updated.clientId,
+            assignedToId: updated.assignedToId,
           },
-        },
-      },
+        });
+
+        await tx.activity.update({
+          where: { id },
+          data: { calendarEventId: event.id },
+        });
+
+        updated.calendarEventId = event.id;
+      }
+
+      return updated;
     });
   }
 
-  // Eliminar actividad
+  // Eliminar actividad + su CalendarEvent asociado
   static async deleteActivity(id: string) {
-    return await prisma.activity.delete({
+    const activity = await prisma.activity.findUnique({
       where: { id },
+      select: { calendarEventId: true },
     });
+
+    if (activity?.calendarEventId) {
+      await prisma.calendarEvent.delete({ where: { id: activity.calendarEventId } }).catch(() => {});
+    }
+
+    return await prisma.activity.delete({ where: { id } });
   }
 
   // Auto-crear actividad al realizar una venta
@@ -200,11 +219,7 @@ export class ActivityService {
   }
 
   // Auto-crear actividad al crear pedido especial
-  static async createSpecialOrderActivity(
-    clientId: string,
-    assignedToId: string,
-    productName: string
-  ) {
+  static async createSpecialOrderActivity(clientId: string, assignedToId: string, productName: string) {
     return await this.createActivity({
       clientId,
       assignedToId,

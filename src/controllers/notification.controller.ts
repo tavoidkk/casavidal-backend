@@ -6,7 +6,7 @@ export class NotificationController {
   // GET /api/notifications
   static async getNotifications(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
       const limit = parseInt(req.query.limit as string) || 20;
       const page = parseInt(req.query.page as string) || 1;
       const type = req.query.type as string;
@@ -27,7 +27,7 @@ export class NotificationController {
   // GET /api/notifications/unread-count
   static async getUnreadCount(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
       const count = await NotificationService.getUnreadCount(userId);
       return successResponse(res, { count });
     } catch (error) {
@@ -39,7 +39,7 @@ export class NotificationController {
   static async markAsRead(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
 
       await NotificationService.markAsRead(id, userId);
       return successResponse(res, { message: 'Notificación marcada como leída' });
@@ -51,7 +51,7 @@ export class NotificationController {
   // PUT /api/notifications/read-all
   static async markAllAsRead(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
       const result = await NotificationService.markAllAsRead(userId);
       return successResponse(res, {
         message: `${result.count} notificaciones marcadas como leídas`,
@@ -65,7 +65,7 @@ export class NotificationController {
   static async deleteNotification(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
 
       await NotificationService.deleteNotification(id, userId);
       return successResponse(res, { message: 'Notificación eliminada' });
@@ -77,7 +77,7 @@ export class NotificationController {
   // DELETE /api/notifications/read
   static async deleteAllRead(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
       const result = await NotificationService.deleteAllRead(userId);
       return successResponse(res, {
         message: `${result.count} notificaciones eliminadas`,
