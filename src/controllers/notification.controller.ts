@@ -8,9 +8,17 @@ export class NotificationController {
     try {
       const userId = req.user!.userId;
       const limit = parseInt(req.query.limit as string) || 20;
+      const page = parseInt(req.query.page as string) || 1;
+      const type = req.query.type as string;
+      const isRead = req.query.isRead === 'true' ? true : req.query.isRead === 'false' ? false : undefined;
+
+      if (page > 1 || type || isRead !== undefined) {
+        const result = await NotificationService.getAllNotifications(userId, page, limit, { type, isRead });
+        return successResponse(res, result);
+      }
 
       const notifications = await NotificationService.getNotificationsByUser(userId, limit);
-      return successResponse(res, notifications);
+      return successResponse(res, { data: notifications, total: notifications.length, page: 1, limit, totalPages: 1 });
     } catch (error) {
       next(error);
     }

@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler';
 import { CreateSaleInput, SaleFilters } from '../types/sale.types';
 import { Prisma } from '@prisma/client';
 import { ActivityService } from './activity.service';
+import { NotificationService } from './notification.service';
 
 export class SaleService {
   // Genera número de venta: VTA-20250101-00001
@@ -43,6 +44,7 @@ export class SaleService {
             salePrice: true,
             wholesalePrice: true,
             currentStock: true,
+            minStock: true,
             isActive: true,
           },
         });
@@ -68,10 +70,12 @@ export class SaleService {
 
         return {
           productId: product.id,
+          productName: product.name,
           quantity: item.quantity,
           unitPrice,
           subtotal: unitPrice * item.quantity,
           currentStock: product.currentStock,
+          minStock: product.minStock,
         };
       })
     );
@@ -112,6 +116,7 @@ export class SaleService {
       });
 
       // Descontar stock y crear movimientos de inventario
+      const lowStockAlerts: Promise<void>[] = [];
       for (const item of itemsWithProducts) {
         const stockAfter = item.currentStock - item.quantity;
         await tx.product.update({
@@ -130,7 +135,11 @@ export class SaleService {
             createdBy: sellerId,
           },
         });
+        if (stockAfter <= item.minStock) {
+          lowStockAlerts.push(NotificationService.notifyLowStock(item.productId, item.productName, stockAfter));
+        }
       }
+      Promise.all(lowStockAlerts).catch(console.error);
 
       // Actualizar cliente
       const newTotal = Number(client.totalPurchases) + total;

@@ -38,6 +38,9 @@ importers:
       helmet:
         specifier: ^7.1.0
         version: 7.2.0
+      html5-qrcode:
+        specifier: ^2.3.8
+        version: 2.3.8
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
@@ -1092,6 +1095,9 @@ packages:
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
+
+  html5-qrcode@2.3.8:
+    resolution: {integrity: sha512-jsr4vafJhwoLVEDW3n1KvPnCCXWaQfRng0/EEYk1vNcQGcG/htAdhJX0be8YyqMoSz7+hZvOZSTAepsabiuhiQ==}
 
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
@@ -2645,6 +2651,8 @@ snapshots:
   helmet@7.2.0: {}
 
   html-escaper@2.0.2: {}
+
+  html5-qrcode@2.3.8: {}
 
   http-errors@2.0.1:
     dependencies:

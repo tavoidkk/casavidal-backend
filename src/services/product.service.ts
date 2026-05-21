@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { NotificationService } from './notification.service';
 import { 
   CreateProductInput, 
   UpdateProductInput, 
@@ -277,6 +278,10 @@ export class ProductService {
         createdBy: userId,
       },
     });
+
+    if (stockAfter <= updatedProduct.minStock) {
+      NotificationService.notifyLowStock(updatedProduct.id, updatedProduct.name, stockAfter).catch(console.error);
+    }
 
     return updatedProduct;
   }

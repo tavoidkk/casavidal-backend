@@ -23,12 +23,24 @@ export class NotificationService {
   }
 
   // Obtener notificaciones de un usuario
-  static async getNotificationsByUser(userId: string, limit = 20) {
+  static async getNotificationsByUser(userId: string, limit = 20, offset = 0) {
     return await prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: limit,
+      skip: offset,
     });
+  }
+
+  static async getAllNotifications(userId: string, page = 1, limit = 20, filter?: { type?: string; isRead?: boolean }) {
+    const where: any = { userId };
+    if (filter?.type) where.type = filter.type;
+    if (filter?.isRead !== undefined) where.isRead = filter.isRead;
+    const [data, total] = await Promise.all([
+      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: limit, skip: (page - 1) * limit }),
+      prisma.notification.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   // Contar notificaciones no leídas
@@ -100,10 +112,10 @@ export class NotificationService {
     const notifications = users.map((user) =>
       this.createNotification({
         userId: user.id,
-        type: 'INVENTARIO',
-        title: '⚠️ Stock Bajo',
+        type: 'STOCK_BAJO',
+        title: 'Stock Bajo',
         message: `El producto "${productName}" tiene solo ${currentStock} unidades disponibles.`,
-        link: `/products/${productId}`,
+        link: `/products?lowStock=true`,
       })
     );
 
@@ -124,8 +136,8 @@ export class NotificationService {
     const notifications = users.map((user) =>
       this.createNotification({
         userId: user.id,
-        type: 'PEDIDO',
-        title: '🛒 Nuevo Pedido Especial',
+        type: 'PEDIDO_LISTO',
+        title: 'Nuevo Pedido Especial',
         message: `${clientName} ha solicitado el producto "${productName}".`,
         link: `/special-orders/${orderId}`,
       })
@@ -142,8 +154,8 @@ export class NotificationService {
   ) {
     return await this.createNotification({
       userId,
-      type: 'PEDIDO',
-      title: '✅ Pedido Especial Listo',
+      type: 'PEDIDO_LISTO',
+      title: 'Pedido Especial Listo',
       message: `Tu pedido del producto "${productName}" está listo para retirar.`,
       link: `/special-orders/${orderId}`,
     });
@@ -159,8 +171,8 @@ export class NotificationService {
     const notifications = users.map((user) =>
       this.createNotification({
         userId: user.id,
-        type: 'VENTA',
-        title: '💰 Venta Grande',
+        type: 'VENTA_COMPLETADA',
+        title: 'Venta Grande',
         message: `Nueva venta de $${total.toLocaleString('es-VE', { minimumFractionDigits: 2 })} a ${clientName}.`,
         link: `/sales/${saleId}`,
       })

@@ -114,6 +114,33 @@ export class DashboardService {
     });
   }
 
+  static async getPendingActivities() {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart.getTime() + 86400000);
+
+    const [pendingTasks, todayAppointments] = await Promise.all([
+      prisma.activity.count({
+        where: { status: 'PENDIENTE', dueDate: { lte: todayEnd } },
+      }),
+      prisma.activity.findMany({
+        where: { dueDate: { gte: todayStart, lte: todayEnd } },
+        select: {
+          id: true,
+          subject: true,
+          type: true,
+          dueDate: true,
+          status: true,
+          client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
+        },
+        orderBy: { dueDate: 'asc' },
+        take: 10,
+      }),
+    ]);
+
+    return { pendingTasks, todayAppointments };
+  }
+
   // Top clientes por compras totales
   static async getTopClients(limit = 5) {
     const clients = await prisma.client.findMany({

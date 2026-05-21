@@ -45,4 +45,14 @@ export class DashboardController {
       next(error);
     }
   }
+
+  // GET /api/dashboard/pending-activities
+  static async getPendingActivities(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await DashboardService.getPendingActivities();
+      return successResponse(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
