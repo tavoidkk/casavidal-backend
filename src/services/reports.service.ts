@@ -90,6 +90,16 @@ export class ReportsService {
 
   // 4. Reporte de Actividad CRM
   static async actividades(filters: { dateFrom?: Date; dateTo?: Date; type?: string; userId?: string }) {
+    await prisma.activity.updateMany({
+      where: {
+        status: 'PENDIENTE',
+        dueDate: { lt: new Date() },
+      },
+      data: {
+        status: 'PERDIDA',
+      },
+    });
+
     const where: any = {};
     if (filters.dateFrom || filters.dateTo) {
       where.createdAt = {};

@@ -115,6 +115,16 @@ export class DashboardService {
   }
 
   static async getPendingActivities() {
+    await prisma.activity.updateMany({
+      where: {
+        status: 'PENDIENTE',
+        dueDate: { lt: new Date() },
+      },
+      data: {
+        status: 'PERDIDA',
+      },
+    });
+
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 86400000);

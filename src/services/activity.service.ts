@@ -42,6 +42,7 @@ export class ActivityService {
 
   // Obtener actividades de un cliente (Timeline)
   static async getActivitiesByClient(clientId: string) {
+    await this.markOverdueAsLost();
     return await prisma.activity.findMany({
       where: { clientId },
       include: {
@@ -59,6 +60,7 @@ export class ActivityService {
 
   // Obtener actividades de un usuario
   static async getActivitiesByUser(assignedToId: string, limit = 50) {
+    await this.markOverdueAsLost();
     return await prisma.activity.findMany({
       where: { assignedToId },
       include: {
@@ -84,6 +86,7 @@ export class ActivityService {
     startDate?: Date;
     endDate?: Date;
   }) {
+    await this.markOverdueAsLost();
     const where: any = {};
 
     if (filters?.type) where.type = filters.type;
@@ -121,6 +124,7 @@ export class ActivityService {
 
   // Obtener una actividad por ID
   static async getActivityById(id: string) {
+    await this.markOverdueAsLost();
     return await prisma.activity.findUnique({
       where: { id },
       include: {
@@ -154,7 +158,7 @@ export class ActivityService {
       description?: string;
       type?: ActivityType;
       dueDate?: Date;
-      status?: 'PENDIENTE' | 'COMPLETADA' | 'CANCELADA';
+      status?: 'PENDIENTE' | 'COMPLETADA' | 'CANCELADA' | 'PERDIDA';
       completedAt?: Date | null;
     }
   ) {
@@ -177,6 +181,19 @@ export class ActivityService {
             clientType: true,
           },
         },
+      },
+    });
+  }
+
+  // Marcar actividades vencidas como perdidas
+  static async markOverdueAsLost(referenceDate: Date = new Date()) {
+    return await prisma.activity.updateMany({
+      where: {
+        status: 'PENDIENTE',
+        dueDate: { lt: referenceDate },
+      },
+      data: {
+        status: 'PERDIDA',
       },
     });
   }
@@ -216,6 +233,7 @@ export class ActivityService {
 
   // Obtener estadísticas de actividades
   static async getActivityStats(clientId?: string) {
+    await this.markOverdueAsLost();
     const where = clientId ? { clientId } : {};
 
     const [total, byType] = await Promise.all([

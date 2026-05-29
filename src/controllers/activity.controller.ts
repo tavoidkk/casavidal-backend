@@ -27,7 +27,7 @@ const updateActivitySchema = z.object({
     description: z.string().optional(),
     type: z.enum(['LLAMADA', 'EMAIL', 'REUNION', 'NOTA', 'TAREA', 'SEGUIMIENTO']).optional(),
     scheduledFor: z.string().optional(),
-    status: z.enum(['PENDIENTE', 'COMPLETADA', 'CANCELADA']).optional(),
+    status: z.enum(['PENDIENTE', 'COMPLETADA', 'CANCELADA', 'PERDIDA']).optional(),
   }),
 });
 

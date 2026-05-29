@@ -576,6 +576,7 @@ enum ActivityStatus {
   PENDIENTE
   COMPLETADA
   CANCELADA
+  PERDIDA
 }
 
 // ============================================
