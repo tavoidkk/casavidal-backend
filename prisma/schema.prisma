@@ -617,6 +617,9 @@ model Activity {
   assignedToId String
   assignedTo   User           @relation(fields: [assignedToId], references: [id])
   
+  // CalendarEvent sincronizado (opcional, solo si dueDate está presente)
+  calendarEventId String?  @unique
+
   // Fechas
   dueDate     DateTime?
   completedAt DateTime?
@@ -734,6 +737,9 @@ model Notification {
   isRead      Boolean           @default(false)
   readAt      DateTime?
   
+  // Link de navegación (ruta frontend)
+  link        String?
+
   // Metadata
   metadata    Json?             // Datos adicionales en JSON
   
@@ -778,4 +784,15 @@ model Settings {
   updatedAt           DateTime @updatedAt
 
   @@map("settings")
+}
+
+model DismissedSuggestion {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String
+  ruleKey   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, clientId, ruleKey])
+  @@map("dismissed_suggestions")
 }

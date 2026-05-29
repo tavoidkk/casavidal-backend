@@ -1,11 +1,18 @@
 import { Router } from 'express';
 import { ActivityController } from '../controllers/activity.controller';
+import { SuggestionsController } from '../controllers/suggestions.controller';
 import { authenticate, requireRole } from '../middleware/authMiddleware';
 
 const router = Router();
 
 // Todas las rutas requieren autenticación
 router.use(authenticate);
+
+// Sugerencias inteligentes (debe ir antes de /:id para evitar conflicto)
+router.get('/suggestions', SuggestionsController.getSuggestions);
+router.get('/suggestions/count', SuggestionsController.getSuggestionCount);
+router.post('/suggestions/:id/apply', SuggestionsController.applySuggestion);
+router.post('/suggestions/:id/dismiss', SuggestionsController.dismissSuggestion);
 
 // Estadísticas de actividades
 router.get('/stats', ActivityController.getStats);
