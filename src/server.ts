@@ -32,6 +32,14 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️  Uncaught Exception:', err);
+});
+
 const startServer = async () => {
   try {
     await connectWithRetry();
