@@ -39,13 +39,16 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // 100 requests por ventana
-  message: 'Demasiadas peticiones, intenta más tarde',
-});
-app.use('/api/', limiter);
+// Rate limiting — solo en producción, sin límites en desarrollo
+if (env.NODE_ENV === 'production') {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    message: 'Demasiadas peticiones, intenta más tarde',
+    standardHeaders: true,
+  });
+  app.use('/api/', limiter);
+}
 
 // Body parser
 app.use(express.json());

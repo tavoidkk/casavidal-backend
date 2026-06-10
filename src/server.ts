@@ -1,6 +1,6 @@
 import { app } from './app';
 import { env } from './config/env';
-import { prisma, pool } from './config/database';
+import { prisma } from './config/database';
 
 const PORT = env.PORT;
 
@@ -21,7 +21,6 @@ async function shutdown() {
   console.log('\n🛑 Cerrando servidor...');
   try {
     await prisma.$disconnect();
-    await pool.end();
     console.log('✅ Conexiones cerradas');
   } catch (err) {
     console.error('Error al cerrar conexiones:', err);
