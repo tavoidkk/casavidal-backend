@@ -13,6 +13,8 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
+  OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY es requerida para funciones de IA'),
+  OPENROUTER_MODEL: z.string().default('deepseek/deepseek-chat'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
+import { AIService } from './ai.service';
 
 /**
  * Cache simple en memoria para recomendaciones
@@ -306,8 +307,215 @@ export class RecommendationService {
   }
 
   /**
+   * Obtener recomendaciones mejoradas con IA
+   * Usa LLM para analizar y rankear productos similares con razones contextuales
+   */
+  static async getAIEnhancedRecommendations(productId: string, limit = 6): Promise<RecommendationItem[]> {
+    const cacheKey = `ai:${productId}:${limit}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const [sqlResults, product] = await Promise.all([
+        this.getRecommendationsForProduct(productId, limit * 2),
+        prisma.product.findUnique({
+          where: { id: productId },
+          select: { name: true, description: true, category: { select: { name: true } } },
+        }),
+      ]);
+
+      if (!product || sqlResults.length === 0) return sqlResults;
+
+      const candidates = await prisma.product.findMany({
+        where: {
+          id: { in: sqlResults.map(r => r.id) },
+          isActive: true,
+        },
+        select: {
+          id: true, name: true, description: true, salePrice: true,
+          category: { select: { name: true } },
+        },
+      });
+
+      const productDesc = product.description || product.name;
+      const candidatesList = candidates.map(p =>
+        `- ${p.name} (${p.category?.name || 'Sin categoría'}): ${p.description || 'Sin descripción'} — $${p.salePrice}`
+      ).join('\n');
+
+      const prompt = `Eres un experto en ferretería recomendando productos complementarios o similares.
+
+Producto actual: "${product.name}" — ${productDesc}
+
+Productos candidatos para recomendar:
+${candidatesList}
+
+Analiza cuáles de estos productos son más relevantes para recomendar junto con "${product.name}". Para cada uno, da una razón corta y práctica (para qué sirve, por qué complementa, cuándo se usa junto).
+
+Responde SOLO con un JSON array válido, sin markdown:
+[{ "id": "id-del-producto", "reason": "razón de recomendación", "score": 85 }]
+
+Donde score es 0-100 según qué tan relevante es la recomendación. No incluyas productos que no tengan relación útil. Máximo ${limit} productos.`;
+
+      const response = await AIService.chat([{ role: 'user', content: prompt }], { temperature: 0.2 });
+
+      let aiRanked: Array<{ id: string; reason: string; score: number }> = [];
+      try {
+        const cleaned = response.replace(/```json/g, '').replace(/```/g, '').trim();
+        aiRanked = JSON.parse(cleaned);
+      } catch { /* fallback: keep SQL results */ }
+
+      if (aiRanked.length === 0) {
+        cache.set(cacheKey, sqlResults);
+        return sqlResults;
+      }
+
+      const sqlMap = new Map(sqlResults.map(r => [r.id, r]));
+      const enhanced = aiRanked
+        .map(ai => {
+          const sql = sqlMap.get(ai.id);
+          if (!sql) return null;
+          return {
+            ...sql,
+            reason: 'ai_assisted' as const,
+            score: Math.round((ai.score + sql.score) / 2),
+          };
+        })
+        .filter((r): r is RecommendationItem & { reason: 'ai_assisted' } => r !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      if (enhanced.length === 0) {
+        cache.set(cacheKey, sqlResults);
+        return sqlResults;
+      }
+
+      cache.set(cacheKey, enhanced);
+      return enhanced;
+    } catch (error) {
+      console.error('Error en getAIEnhancedRecommendations:', error);
+      return this.getRecommendationsForProduct(productId, limit);
+    }
+  }
+
+  /**
+   * Recomendaciones personalizadas para un cliente
+   * Basado en su historial de compras + IA
+   */
+  static async getClientRecommendations(clientId: string, limit = 10): Promise<RecommendationItem[]> {
+    const cacheKey = `client:${clientId}:${limit}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+        select: {
+          firstName: true, lastName: true, companyName: true, clientType: true,
+          category: true, totalPurchases: true, purchaseCount: true,
+        },
+      });
+      if (!client) return [];
+
+      const recentSales = await prisma.sale.findMany({
+        where: { clientId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          items: {
+            include: { product: { select: { name: true, category: { select: { name: true } } } } },
+          },
+        },
+      });
+
+      const purchasedProductIds = new Set(recentSales.flatMap(s => s.items.map(i => i.productId)));
+      const purchasedContext = recentSales.flatMap(s =>
+        s.items.map(i => `- ${i.product.name} (${i.product.category?.name || ''}) x${i.quantity}`)
+      ).join('\n');
+
+      const candidates = await prisma.product.findMany({
+        where: {
+          isActive: true,
+          currentStock: { gt: 0 },
+          id: { notIn: Array.from(purchasedProductIds) },
+        },
+        select: {
+          id: true, name: true, sku: true, salePrice: true, currentStock: true,
+          description: true,
+          category: { select: { name: true } },
+        },
+        take: 30,
+        orderBy: { salePrice: 'asc' },
+      });
+
+      if (candidates.length === 0) return [];
+
+      const name = client.clientType === 'JURIDICO' ? client.companyName : `${client.firstName} ${client.lastName}`;
+      const candidatesList = candidates.map(p =>
+        `- ${p.name} (${p.category?.name || ''}) — $${p.salePrice} — ${p.description || ''}`
+      ).join('\n');
+
+      const prompt = `Eres un asesor de ventas de ferretería recomendando productos para un cliente específico.
+
+Cliente: ${name}
+Categoría: ${client.category}
+Ha gastado: $${client.totalPurchases} en ${client.purchaseCount} compras
+
+Productos que ya compró antes:
+${purchasedContext || '(cliente nuevo, sin compras previas)'}
+
+Catálogo disponible para recomendar:
+${candidatesList}
+
+Selecciona hasta ${limit} productos del catálogo que este cliente probablemente necesitaría, basado en:
+1. Su historial de compras (productos relacionados, consumibles, complementos)
+2. Su categoría (cliente frecuente, VIP, mayorista, etc.)
+3. Productos que suelen comprar clientes similares
+
+Para cada producto indica una razón personalizada.
+
+Responde SOLO con un JSON array válido, sin markdown:
+[{ "id": "id-del-producto", "reason": "razón personalizada", "score": 85 }]
+
+Score 0-100 según relevancia para ESTE cliente específico.`;
+
+      const response = await AIService.chat([{ role: 'user', content: prompt }], { temperature: 0.3 });
+
+      let aiRanked: Array<{ id: string; reason: string; score: number }> = [];
+      try {
+        const cleaned = response.replace(/```json/g, '').replace(/```/g, '').trim();
+        aiRanked = JSON.parse(cleaned);
+      } catch { return []; }
+
+      const productMap = new Map(candidates.map(p => [p.id, p]));
+      const recommendations: RecommendationItem[] = aiRanked
+        .map(ai => {
+          const product = productMap.get(ai.id);
+          if (!product) return null;
+          return {
+            id: product.id,
+            name: product.name,
+            sku: product.sku,
+            salePrice: Number(product.salePrice),
+            currentStock: product.currentStock,
+            category: product.category,
+            reason: 'ai_assisted' as const,
+            score: Math.min(100, ai.score),
+          };
+        })
+        .filter((r): r is RecommendationItem => r !== null)
+        .slice(0, limit);
+
+      cache.set(cacheKey, recommendations);
+      return recommendations;
+    } catch (error) {
+      console.error('Error en getClientRecommendations:', error);
+      return [];
+    }
+  }
+
+  /**
    * Obtener todas las recomendaciones para un producto
-   * Combina múltiples algoritmos y retorna los mejores
+   * Combina SQL + IA y retorna los mejores
    */
   static async getRecommendationsForProduct(productId: string, limit = 6): Promise<RecommendationItem[]> {
     try {

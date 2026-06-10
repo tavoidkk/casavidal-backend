@@ -59,6 +59,36 @@ export class RecommendationController {
   }
 
   /**
+   * GET /api/recommendations/ai/:productId
+   * Obtener recomendaciones mejoradas con IA
+   */
+  static async getAIRecommendations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { productId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 6;
+      const recommendations = await RecommendationService.getAIEnhancedRecommendations(productId, limit);
+      return successResponse(res, recommendations);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/recommendations/client/:clientId
+   * Obtener recomendaciones personalizadas para un cliente
+   */
+  static async getClientRecommendations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { clientId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const recommendations = await RecommendationService.getClientRecommendations(clientId, limit);
+      return successResponse(res, recommendations);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * POST /api/recommendations/clear-cache
    * Limpiar cache de recomendaciones
    * Solo ADMIN

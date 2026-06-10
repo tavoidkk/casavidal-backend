@@ -27,6 +27,9 @@ import bookingSettingsRoutes from './routes/bookingSettings.routes';
 import calendarEventsRoutes from './routes/calendarEvents.routes';
 import googleCalendarRoutes from './routes/googleCalendar.routes';
 import reportsRoutes from './routes/reports.routes';
+import chatRoutes from './routes/chat.routes';
+import salesAssistantRoutes from './routes/sales-assistant.routes';
+import purchaseOrderRoutes from './routes/purchaseOrder.routes';
 
 const app = express();
 
@@ -86,6 +89,9 @@ app.use('/api/booking-settings', bookingSettingsRoutes);
 app.use('/api/calendar-events', calendarEventsRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/sales-assistant', salesAssistantRoutes);
+app.use('/api/purchase-orders', purchaseOrderRoutes);
 
 // Error handling
 app.use(notFound);

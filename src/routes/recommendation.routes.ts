@@ -31,6 +31,18 @@ router.post('/cart', RecommendationController.getCartRecommendations);
 router.get('/trending', RecommendationController.getTrendingProducts);
 
 /**
+ * GET /api/recommendations/ai/:productId
+ * Obtener recomendaciones mejoradas con IA
+ */
+router.get('/ai/:productId', RecommendationController.getAIRecommendations);
+
+/**
+ * GET /api/recommendations/client/:clientId
+ * Obtener recomendaciones personalizadas para un cliente
+ */
+router.get('/client/:clientId', RecommendationController.getClientRecommendations);
+
+/**
  * POST /api/recommendations/clear-cache
  * Limpiar cache de recomendaciones
  * Solo ADMIN puede limpiar cache

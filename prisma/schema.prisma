@@ -795,3 +795,36 @@ model DismissedSuggestion {
   @@unique([userId, clientId, ruleKey])
   @@map("dismissed_suggestions")
 }
+
+// ============================================
+// CHATBOT IA
+// ============================================
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ChatConversation {
+  id        String   @id @default(uuid())
+  userId    String?  // null si el chat es anónimo
+  title     String?  // Título auto-generado
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatRole
+  content        String
+  createdAt      DateTime         @default(now())
+
+  @@map("chat_messages")
+}
