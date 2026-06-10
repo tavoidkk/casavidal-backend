@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { CategoryController } from '../controllers/category.controller';
 import { authenticate, requireRole } from '../middleware/authMiddleware';
-import { validate } from '../middleware/validationMiddleware';
+//import { validate } from '../middleware/validation.middleware';
 
 const router = Router();
 
