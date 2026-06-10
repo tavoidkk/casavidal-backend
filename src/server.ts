@@ -11,17 +11,17 @@ async function connectWithRetry(retries = 5, delay = 3000): Promise<void> {
       return;
     } catch (err) {
       if (attempt === retries) throw err;
-      console.log(`⏳ DB no disponible, reintentando (${attempt}/${retries})...`);
+      console.log(`DB no disponible, reintentando (${attempt}/${retries})...`);
       await new Promise(res => setTimeout(res, delay));
     }
   }
 }
 
 async function shutdown() {
-  console.log('\n🛑 Cerrando servidor...');
+  console.log('\nCerrando servidor...');
   try {
     await prisma.$disconnect();
-    console.log('✅ Conexiones cerradas');
+    console.log('Conexiones cerradas');
   } catch (err) {
     console.error('Error al cerrar conexiones:', err);
   }
@@ -32,20 +32,20 @@ process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 process.on('unhandledRejection', (reason) => {
-  console.error('⚠️  Unhandled Promise Rejection:', reason);
+  console.error('Unhandled Promise Rejection:', reason);
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('⚠️  Uncaught Exception:', err);
+  console.error('Uncaught Exception:', err);
 });
 
 const startServer = async () => {
   try {
     await connectWithRetry();
-    console.log('✅ Base de datos conectada');
+    console.log('Base de datos conectada');
 
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+      console.log(`Servidor corriendo en http://localhost:${PORT}`);
       console.log(`Environment: ${env.NODE_ENV}`);
       console.log(`Frontend URL: ${env.FRONTEND_URL}`);
     });
@@ -54,7 +54,7 @@ const startServer = async () => {
       await shutdown();
     });
   } catch (error) {
-    console.error('❌ Error al iniciar el servidor:', error);
+    console.error('Error al iniciar el servidor:', error);
     process.exit(1);
   }
 };
