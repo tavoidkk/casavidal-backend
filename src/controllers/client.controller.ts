@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ClientService } from '../services/client.service';
 import { successResponse, paginatedResponse } from '../utils/response';
+import { parsePositiveInt } from '../utils/query';
 import { z } from 'zod';
 
 // Schemas de validación
@@ -174,8 +175,8 @@ export class ClientController {
         isActive: req.query.isActive !== undefined 
           ? req.query.isActive === 'true' 
           : undefined,
-        page: parseInt(req.query.page as string) || 1,
-        limit: parseInt(req.query.limit as string) || 10,
+        page: parsePositiveInt(req.query.page, 1, { max: 10000 }),
+        limit: parsePositiveInt(req.query.limit, 10, { max: 100 }),
       };
 
       const result = await ClientService.findAll(filters);
@@ -240,7 +241,7 @@ export class ClientController {
   // GET /api/clients/top-scoring
   static async getTopScoring(req: Request, res: Response, next: NextFunction) {
     try {
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parsePositiveInt(req.query.limit, 10, { max: 50 });
       const clients = await ClientService.getTopScoringClients(limit);
       return successResponse(res, clients);
     } catch (error) {

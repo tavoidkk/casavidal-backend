@@ -13,14 +13,18 @@ export const validate =
       return next();
     } catch (error) {
       if (error instanceof ZodError) {
-        console.error('❌ ZOD ERROR:', JSON.stringify(error.errors, null, 2));
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('❌ ZOD ERROR:', JSON.stringify(error.errors, null, 2));
+        }
         return res.status(400).json({
           message: 'Validation error',
           errors: error.errors,
         });
       }
 
-      console.error('❌ VALIDATION ERROR:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('❌ VALIDATION ERROR:', error);
+      }
       return res.status(400).json({ message: 'Validation error' });
     }
   };

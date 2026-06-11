@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { SaleService } from '../services/sale.service';
 import { successResponse, paginatedResponse } from '../utils/response';
+import { parseOptionalDate, parsePositiveInt } from '../utils/query';
 import { z } from 'zod';
 
 export const createSaleSchema = z.object({
@@ -45,10 +46,10 @@ export class SaleController {
         search: req.query.search as string,
         clientId: req.query.clientId as string,
         sellerId: req.query.sellerId as string,
-        dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-        dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
-        page: parseInt(req.query.page as string) || 1,
-        limit: parseInt(req.query.limit as string) || 15,
+        dateFrom: parseOptionalDate(req.query.dateFrom),
+        dateTo: parseOptionalDate(req.query.dateTo),
+        page: parsePositiveInt(req.query.page, 1, { max: 10000 }),
+        limit: parsePositiveInt(req.query.limit, 15, { max: 100 }),
       };
 
       const result = await SaleService.findAll(filters);

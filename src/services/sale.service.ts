@@ -118,24 +118,44 @@ export class SaleService {
       // Descontar stock y crear movimientos de inventario
       const lowStockAlerts: Promise<void>[] = [];
       for (const item of itemsWithProducts) {
-        const stockAfter = item.currentStock - item.quantity;
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { currentStock: stockAfter },
+        const updated = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            isActive: true,
+            currentStock: { gte: item.quantity },
+          },
+          data: {
+            currentStock: { decrement: item.quantity },
+          },
         });
+
+        if (updated.count === 0) {
+          throw new AppError(
+            400,
+            `Stock insuficiente para "${item.productName}". La disponibilidad cambió, actualiza la venta e intenta nuevamente.`
+          );
+        }
+
+        const updatedProduct = await tx.product.findUniqueOrThrow({
+          where: { id: item.productId },
+          select: { currentStock: true, minStock: true },
+        });
+        const stockAfter = updatedProduct.currentStock;
+        const stockBefore = stockAfter + item.quantity;
+
         await tx.inventoryMovement.create({
           data: {
             productId: item.productId,
             type: 'SALIDA',
             quantity: -item.quantity,
-            stockBefore: item.currentStock,
+            stockBefore,
             stockAfter,
             reference: saleNumber,
             notes: `Venta ${saleNumber}`,
             createdBy: sellerId,
           },
         });
-        if (stockAfter <= item.minStock) {
+        if (stockAfter <= updatedProduct.minStock) {
           lowStockAlerts.push(NotificationService.notifyLowStock(item.productId, item.productName, stockAfter));
         }
       }

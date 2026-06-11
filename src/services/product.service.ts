@@ -243,44 +243,65 @@ export class ProductService {
 
   // Ajustar stock (entrada/salida manual)
   static async adjustStock(data: AdjustStockInput, userId?: string) {
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
-      select: { currentStock: true },
+    const signedQuantity = ['SALIDA', 'AJUSTE_NEGATIVO'].includes(data.type)
+      ? -Math.abs(data.quantity)
+      : Math.abs(data.quantity);
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      const existing = await tx.product.findUnique({
+        where: { id: data.productId },
+        select: { id: true, currentStock: true, isActive: true },
+      });
+
+      if (!existing || !existing.isActive) {
+        throw new AppError(404, 'Producto no encontrado');
+      }
+
+      if (signedQuantity < 0) {
+        const updated = await tx.product.updateMany({
+          where: {
+            id: data.productId,
+            currentStock: { gte: Math.abs(signedQuantity) },
+          },
+          data: {
+            currentStock: { decrement: Math.abs(signedQuantity) },
+          },
+        });
+
+        if (updated.count === 0) {
+          throw new AppError(400, 'El stock no puede ser negativo');
+        }
+      } else {
+        await tx.product.update({
+          where: { id: data.productId },
+          data: { currentStock: { increment: signedQuantity } },
+        });
+      }
+
+      const product = await tx.product.findUniqueOrThrow({
+        where: { id: data.productId },
+      });
+      const stockAfter = product.currentStock;
+      const stockBefore = stockAfter - signedQuantity;
+
+      await tx.inventoryMovement.create({
+        data: {
+          productId: data.productId,
+          type: data.type,
+          quantity: signedQuantity,
+          stockBefore,
+          stockAfter,
+          reference: data.reference,
+          notes: data.notes,
+          createdBy: userId,
+        },
+      });
+
+      return product;
     });
 
-    if (!product) {
-      throw new AppError(404, 'Producto no encontrado');
-    }
-
-    const stockBefore = product.currentStock;
-    const stockAfter = stockBefore + data.quantity;
-
-    if (stockAfter < 0) {
-      throw new AppError(400, 'El stock no puede ser negativo');
-    }
-
-    // Actualizar stock del producto
-    const updatedProduct = await prisma.product.update({
-      where: { id: data.productId },
-      data: { currentStock: stockAfter },
-    });
-
-    // Crear movimiento de inventario
-    await prisma.inventoryMovement.create({
-      data: {
-        productId: data.productId,
-        type: data.type,
-        quantity: data.quantity,
-        stockBefore,
-        stockAfter,
-        reference: data.reference,
-        notes: data.notes,
-        createdBy: userId,
-      },
-    });
-
-    if (stockAfter <= updatedProduct.minStock) {
-      NotificationService.notifyLowStock(updatedProduct.id, updatedProduct.name, stockAfter).catch(console.error);
+    if (updatedProduct.currentStock <= updatedProduct.minStock) {
+      NotificationService.notifyLowStock(updatedProduct.id, updatedProduct.name, updatedProduct.currentStock).catch(console.error);
     }
 
     return updatedProduct;

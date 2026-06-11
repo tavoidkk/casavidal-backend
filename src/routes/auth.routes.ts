@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { AuthController, registerSchema, loginSchema } from '../controllers/auth.controllers';
 import { validate } from '../middleware/validation.middleware';
-import { authenticate } from '../middleware/authMiddleware';
+import { authenticate, requireAdmin } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -17,6 +17,8 @@ const loginLimiter = rateLimit({
 // POST /api/auth/register - Registro
 router.post(
   '/register',
+  authenticate,
+  requireAdmin,
   validate(registerSchema),
   AuthController.register
 );

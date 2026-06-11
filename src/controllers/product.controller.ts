@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProductService } from '../services/product.service';
 import { successResponse, paginatedResponse } from '../utils/response';
+import { parsePositiveInt } from '../utils/query';
 import { z } from 'zod';
 
 // Schemas de validación
@@ -47,7 +48,7 @@ export const updateProductSchema = z.object({
 export const adjustStockSchema = z.object({
   body: z.object({
     productId: z.string().uuid(),
-    quantity: z.number().int(),
+    quantity: z.number().int().refine((value) => value !== 0, 'La cantidad no puede ser cero'),
     type: z.enum(['ENTRADA', 'SALIDA', 'AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO', 'DEVOLUCION']),
     reference: z.string().max(100).optional(),
     notes: z.string().max(500).optional(),
@@ -86,8 +87,8 @@ export class ProductController {
         categoryId: req.query.categoryId as string,
         isActive: req.query.isActive !== 'false',
         lowStock: req.query.lowStock === 'true',
-        page: parseInt(req.query.page as string) || 1,
-        limit: parseInt(req.query.limit as string) || 10,
+        page: parsePositiveInt(req.query.page, 1, { max: 10000 }),
+        limit: parsePositiveInt(req.query.limit, 10, { max: 100 }),
       };
 
       const result = await ProductService.findAll(filters);
@@ -212,7 +213,7 @@ export class ProductController {
   // GET /api/products/top-selling
   static async getTopSelling(req: Request, res: Response, next: NextFunction) {
     try {
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parsePositiveInt(req.query.limit, 10, { max: 50 });
       const products = await ProductService.getTopSelling(limit);
       return successResponse(res, products);
     } catch (error) {
