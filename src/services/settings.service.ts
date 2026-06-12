@@ -117,7 +117,7 @@ export class SettingsService {
             enableAutoBackup: data.enableAutoBackup !== undefined ? data.enableAutoBackup : false,
             locale: data.locale || 'es-CL',
             timezone: data.timezone || 'America/Santiago',
-            usdToBsRate: data.usdToBsRate !== undefined ? new Decimal(data.usdToBsRate) : null,
+            usdToBsRate: data.usdToBsRate !== undefined && data.usdToBsRate !== null ? new Decimal(data.usdToBsRate) : null,
           },
         });
       } else {
@@ -138,8 +138,8 @@ export class SettingsService {
         if (data.locale !== undefined) updateData.locale = data.locale;
         if (data.timezone !== undefined) updateData.timezone = data.timezone;
         if (data.usdToBsRate !== undefined) {
-          updateData.usdToBsRate = new Decimal(data.usdToBsRate);
-          updateData.usdToBsUpdatedAt = new Date();
+          updateData.usdToBsRate = data.usdToBsRate !== null ? new Decimal(data.usdToBsRate) : null;
+          updateData.usdToBsUpdatedAt = data.usdToBsRate !== null ? new Date() : null;
         }
 
         settings = await prisma.settings.update({
