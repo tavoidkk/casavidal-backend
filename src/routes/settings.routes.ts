@@ -17,6 +17,13 @@ router.use(authenticate);
 router.get('/', SettingsController.getSettings);
 
 /**
+ * GET /api/settings/rate
+ * Obtener tasa de cambio USD -> Bs
+ * Sin autenticación para que el frontend pueda consultarla libremente
+ */
+router.get('/rate', SettingsController.getRate);
+
+/**
  * PUT /api/settings
  * Actualizar configuración del sistema
  * Solo ADMIN puede modificar

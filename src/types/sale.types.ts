@@ -11,6 +11,8 @@ export interface CreateSaleInput {
   paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'PAGO_MOVIL' | 'ZELLE';
   notes?: string;
   additionalCharges?: number;
+  currency?: 'USD' | 'BS';
+  paymentReference?: string;
 }
 
 export interface SaleFilters {

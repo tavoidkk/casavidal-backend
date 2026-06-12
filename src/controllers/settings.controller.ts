@@ -43,6 +43,12 @@ const updateSettingsSchema = z.object({
     // Localización
     locale: z.string().regex(/^[a-z]{2}-[A-Z]{2}$/, 'Formato de locale inválido (ej: es-CL)').optional(),
     timezone: z.string().min(1, 'La zona horaria es obligatoria').optional(),
+
+    // Tasa de cambio USD -> Bs
+    usdToBsRate: z.preprocess(
+      (value) => (typeof value === 'string' && value !== '' ? Number(value) : value),
+      z.number().min(0, 'La tasa de cambio debe ser un número positivo').optional().nullable()
+    ).optional(),
   })
 });
 
@@ -135,6 +141,22 @@ export class SettingsController {
 
       const logoUrl = `/uploads/settings/${file.filename}`;
       return successResponse(res, { url: logoUrl }, 'Logo subido exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/settings/rate
+   * Obtener la tasa de cambio USD -> Bs (público, sin auth)
+   */
+  static async getRate(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const settings = await SettingsService.getSettings();
+      return successResponse(res, {
+        usdToBsRate: settings.usdToBsRate ? Number(settings.usdToBsRate) : null,
+        usdToBsUpdatedAt: settings.usdToBsUpdatedAt,
+      });
     } catch (error) {
       next(error);
     }

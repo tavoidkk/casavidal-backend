@@ -26,6 +26,8 @@ export const createSaleSchema = z.object({
     ]),
     notes: z.string().max(500).optional(),
     additionalCharges: z.number().min(0).optional(),
+    currency: z.enum(['USD', 'BS']).optional(),
+    paymentReference: z.string().max(100).optional(),
   }),
 });
 

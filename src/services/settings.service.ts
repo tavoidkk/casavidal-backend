@@ -28,6 +28,9 @@ export interface UpdateSettingsInput {
   // Localización
   locale?: string;
   timezone?: string;
+
+  // Tasa de cambio USD -> Bs
+  usdToBsRate?: number | null;
 }
 
 export class SettingsService {
@@ -90,6 +93,10 @@ export class SettingsService {
         throw new AppError(400, 'El plazo de pago debe ser un número positivo');
       }
 
+      if (data.usdToBsRate !== undefined && data.usdToBsRate < 0) {
+        throw new AppError(400, 'La tasa de cambio debe ser un número positivo');
+      }
+
       // Obtener configuración actual o crear si no existe
       let settings = await prisma.settings.findFirst();
 
@@ -110,6 +117,7 @@ export class SettingsService {
             enableAutoBackup: data.enableAutoBackup !== undefined ? data.enableAutoBackup : false,
             locale: data.locale || 'es-CL',
             timezone: data.timezone || 'America/Santiago',
+            usdToBsRate: data.usdToBsRate !== undefined ? new Decimal(data.usdToBsRate) : null,
           },
         });
       } else {
@@ -129,6 +137,10 @@ export class SettingsService {
         if (data.enableAutoBackup !== undefined) updateData.enableAutoBackup = data.enableAutoBackup;
         if (data.locale !== undefined) updateData.locale = data.locale;
         if (data.timezone !== undefined) updateData.timezone = data.timezone;
+        if (data.usdToBsRate !== undefined) {
+          updateData.usdToBsRate = new Decimal(data.usdToBsRate);
+          updateData.usdToBsUpdatedAt = new Date();
+        }
 
         settings = await prisma.settings.update({
           where: { id: settings.id },
@@ -176,6 +188,8 @@ export class SettingsService {
           enableAutoBackup: false,
           locale: 'es-CL',
           timezone: 'America/Santiago',
+          usdToBsRate: null,
+          usdToBsUpdatedAt: null,
         },
       });
 
@@ -335,6 +349,8 @@ export class SettingsService {
                 enableAutoBackup: data.settings.enableAutoBackup,
                 locale: data.settings.locale,
                 timezone: data.settings.timezone,
+                usdToBsRate: data.settings.usdToBsRate,
+                usdToBsUpdatedAt: data.settings.usdToBsUpdatedAt,
               },
             });
           } else {

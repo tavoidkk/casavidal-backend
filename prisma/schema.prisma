@@ -301,6 +301,11 @@ enum PaymentMethod {
   ZELLE
 }
 
+enum SaleCurrency {
+  USD
+  BS
+}
+
 model Sale {
   id String @id @default(uuid())
 
@@ -323,6 +328,11 @@ model Sale {
 
   // Pago
   paymentMethod PaymentMethod
+  currency      SaleCurrency @default(USD)
+  paymentReference String?
+
+  // Snapshot de tasa de cambio al momento de la venta (si aplica)
+  usdToBsRateAtSale Decimal? @db.Decimal(10, 4)
 
   // Metadata
   notes String?
@@ -783,6 +793,10 @@ model Settings {
   // Configuración financiera
   currency String  @default("CLP") // CLP, USD, EUR, etc.
   taxRate  Decimal @default(19.00) @db.Decimal(5, 2) // % de IVA
+
+  // Tasa de cambio USD -> Bs (Venezuela)
+  usdToBsRate      Decimal?  @db.Decimal(10, 4) // Tasa del día: Bs por 1 USD
+  usdToBsUpdatedAt DateTime? // Última actualización de la tasa
 
   // Configuración de inventario
   lowStockThreshold Int @default(10) // Umbral para alerta de stock bajo

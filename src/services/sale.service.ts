@@ -4,6 +4,7 @@ import { CreateSaleInput, SaleFilters } from '../types/sale.types';
 import { Prisma } from '@prisma/client';
 import { ActivityService } from './activity.service';
 import { NotificationService } from './notification.service';
+import { SettingsService } from './settings.service';
 
 export class SaleService {
   // Genera número de venta: VTA-20250101-00001
@@ -95,6 +96,14 @@ export class SaleService {
 
     const saleNumber = await this.generateSaleNumber();
 
+    // Determinar moneda y obtener tasa si aplica
+    const currency = data.currency || 'USD';
+    let usdToBsRateAtSale: number | null = null;
+    if (currency === 'BS') {
+      const settings = await SettingsService.getSettings();
+      usdToBsRateAtSale = settings.usdToBsRate ? Number(settings.usdToBsRate) : null;
+    }
+
     // Crear venta en una transacción
     const sale = await prisma.$transaction(async (tx) => {
       const newSale = await tx.sale.create({
@@ -107,6 +116,9 @@ export class SaleService {
           tax: 0,
           total,
           paymentMethod: data.paymentMethod,
+          currency,
+          paymentReference: data.paymentReference,
+          usdToBsRateAtSale: usdToBsRateAtSale !== null ? new Prisma.Decimal(usdToBsRateAtSale) : null,
           notes: data.notes,
           items: {
             create: itemsWithProducts.map((item) => ({
