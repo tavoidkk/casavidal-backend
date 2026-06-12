@@ -13,6 +13,7 @@ export interface CreateSaleInput {
   additionalCharges?: number;
   currency?: 'USD' | 'BS';
   paymentReference?: string;
+  pointsRedeemed?: number; // Puntos de lealtad a canjear
 }
 
 export interface SaleFilters {

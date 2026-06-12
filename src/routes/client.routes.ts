@@ -21,5 +21,7 @@ router.get('/:id', ClientController.getById);
 router.put('/:id', validate(updateClientSchema), ClientController.update);
 router.delete('/:id', ClientController.delete);
 router.post('/:id/loyalty-points', ClientController.addLoyaltyPoints);
+router.get('/:id/points-history', ClientController.getPointsHistory);
+router.post('/:id/redeem-points', ClientController.redeemPoints);
 
 export default router;

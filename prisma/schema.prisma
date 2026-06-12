@@ -110,7 +110,7 @@ model Client {
   source        ClientSource?
   lastContactAt DateTime?
 
-  // Fidelización (sin canje, solo tracking)
+  // Fidelización
   loyaltyPoints  Int     @default(0)
   totalPurchases Decimal @default(0) @db.Decimal(12, 2)
   purchaseCount  Int     @default(0)
@@ -120,11 +120,12 @@ model Client {
   isActive Boolean @default(true)
 
   // Relaciones
-  sales          Sale[]
-  specialOrders  SpecialOrder[]
-  activities     Activity[]
-  calendarEvents CalendarEvent[]
-  scoring        ClientScoring?
+  sales             Sale[]
+  specialOrders     SpecialOrder[]
+  activities        Activity[]
+  calendarEvents    CalendarEvent[]
+  scoring           ClientScoring?
+  pointsTransactions PointsTransaction[]
 
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -325,6 +326,10 @@ model Sale {
   discount Decimal @default(0) @db.Decimal(12, 2)
   tax      Decimal @default(0) @db.Decimal(12, 2)
   total    Decimal @db.Decimal(12, 2)
+
+  // Puntos de lealtad
+  pointsRedeemed  Int     @default(0)
+  pointsDiscount  Decimal @default(0) @db.Decimal(12, 2)
 
   // Pago
   paymentMethod PaymentMethod
@@ -827,6 +832,24 @@ model DismissedSuggestion {
 
   @@unique([userId, clientId, ruleKey])
   @@map("dismissed_suggestions")
+}
+
+// ============================================
+// TRANSACCIONES DE PUNTOS DE LEALTAD
+// ============================================
+
+model PointsTransaction {
+  id             String   @id @default(uuid())
+  clientId       String
+  client         Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  type           String   // 'EARNED' | 'REDEEMED'
+  points         Int      // siempre positivo; el tipo indica dirección
+  runningBalance Int      // saldo después de esta transacción
+  description    String?
+  saleId         String?
+  createdAt      DateTime @default(now())
+
+  @@map("points_transactions")
 }
 
 // ============================================

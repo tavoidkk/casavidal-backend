@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ClientService } from '../services/client.service';
+import { PointsService } from '../services/points.service';
 import { successResponse, paginatedResponse } from '../utils/response';
 import { parsePositiveInt } from '../utils/query';
 import { z } from 'zod';
@@ -278,6 +279,27 @@ export class ClientController {
         points
       );
       return successResponse(res, client, 'Puntos actualizados exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /api/clients/:id/points-history
+  static async getPointsHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const history = await PointsService.getHistory(req.params.id);
+      return successResponse(res, history);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/clients/:id/redeem-points
+  static async redeemPoints(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { points, saleId } = req.body;
+      const result = await PointsService.redeem(req.params.id, points, saleId);
+      return successResponse(res, result, 'Puntos canjeados exitosamente');
     } catch (error) {
       next(error);
     }

@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { ActivityService } from './activity.service';
 import { NotificationService } from './notification.service';
 import { SettingsService } from './settings.service';
+import { PointsService } from './points.service';
 
 export class SaleService {
   // Genera número de venta: VTA-20250101-00001
@@ -92,7 +93,21 @@ export class SaleService {
 
     const subtotal = itemsWithProducts.reduce((sum, i) => sum + i.subtotal, 0);
     const discount = data.discount || 0;
-    const total = Math.max(0, subtotal - discount + additionalCharges);
+    const pointsRedeemed = data.pointsRedeemed || 0;
+    let pointsDiscount = 0;
+
+    if (pointsRedeemed > 0) {
+      const validation = PointsService.validateRedemption(pointsRedeemed, subtotal);
+      if (!validation.isValid) {
+        throw new AppError(400, `El descuento máximo por puntos es $${validation.maxDiscount.toFixed(2)} (${validation.maxPoints} pts)`);
+      }
+      if (pointsRedeemed > client.loyaltyPoints) {
+        throw new AppError(400, `Puntos insuficientes. Disponibles: ${client.loyaltyPoints}`);
+      }
+      pointsDiscount = validation.discountAmount;
+    }
+
+    const total = Math.max(0, subtotal - discount - pointsDiscount + additionalCharges);
 
     const saleNumber = await this.generateSaleNumber();
 
@@ -113,6 +128,8 @@ export class SaleService {
           sellerId,
           subtotal,
           discount,
+          pointsRedeemed,
+          pointsDiscount,
           tax: 0,
           total,
           paymentMethod: data.paymentMethod,
@@ -185,8 +202,12 @@ export class SaleService {
       // Actualizar cliente
       const newTotal = Number(client.totalPurchases) + total;
       const newCount = client.purchaseCount + 1;
-      const loyaltyPointsEarned = Math.floor(total / 10); // 1 punto por cada $10
-      const newLoyaltyPoints = client.loyaltyPoints + loyaltyPointsEarned;
+      const pointsEarnedFromPurchase = Math.floor(total / 10); // 1 punto por cada $10
+
+      let newLoyaltyPoints = client.loyaltyPoints + pointsEarnedFromPurchase;
+      if (pointsRedeemed > 0) {
+        newLoyaltyPoints -= pointsRedeemed;
+      }
 
       // Actualizar categoría automáticamente
       let newCategory = client.category;
@@ -209,6 +230,32 @@ export class SaleService {
           ...(newStage ? { stage: newStage } : {}),
         },
       });
+
+      // Registrar transacción de puntos ganados
+      await tx.pointsTransaction.create({
+        data: {
+          clientId: data.clientId,
+          type: 'EARNED',
+          points: pointsEarnedFromPurchase,
+          runningBalance: newLoyaltyPoints,
+          description: `Compra ${saleNumber} — ${pointsEarnedFromPurchase} pts por $${total.toFixed(2)}`,
+          saleId: newSale.id,
+        },
+      });
+
+      // Registrar canje de puntos si aplica
+      if (pointsRedeemed > 0) {
+        await tx.pointsTransaction.create({
+          data: {
+            clientId: data.clientId,
+            type: 'REDEEMED',
+            points: pointsRedeemed,
+            runningBalance: newLoyaltyPoints,
+            description: `Canje en ${saleNumber} — ${pointsRedeemed} pts por $${pointsDiscount.toFixed(2)} de descuento`,
+            saleId: newSale.id,
+          },
+        });
+      }
 
       // Actualizar scoring del cliente
       await tx.clientScoring.upsert({

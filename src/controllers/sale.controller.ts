@@ -28,6 +28,7 @@ export const createSaleSchema = z.object({
     additionalCharges: z.number().min(0).optional(),
     currency: z.enum(['USD', 'BS']).optional(),
     paymentReference: z.string().max(100).optional(),
+    pointsRedeemed: z.number().int().min(0).optional(),
   }),
 });
 
