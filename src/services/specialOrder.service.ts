@@ -6,6 +6,7 @@ import {
   SpecialOrderFilters,
 } from '../types/specialOrder.types';
 import { Prisma } from '@prisma/client';
+import { SaleService } from './sale.service';
 
 export class SpecialOrderService {
   private static async generateOrderNumber(): Promise<string> {
@@ -25,6 +26,11 @@ export class SpecialOrderService {
   }
 
   static async create(data: CreateSpecialOrderInput, _createdById: string) {
+    const shippingCost = Number(data.shippingCost ?? 0);
+    if (Number.isNaN(shippingCost) || shippingCost < 0) {
+      throw new AppError(400, 'Costo de envío inválido');
+    }
+
     // Verificar cliente
     const client = await prisma.client.findUnique({
       where: { id: data.clientId },
@@ -34,68 +40,87 @@ export class SpecialOrderService {
       throw new AppError(404, 'Cliente no encontrado o inactivo');
     }
 
+    // Verificar proveedor
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: data.supplierId },
+      select: { id: true, isActive: true, name: true },
+    });
+    if (!supplier || !supplier.isActive) {
+      throw new AppError(404, 'Proveedor no encontrado o inactivo');
+    }
+
     // Verificar producto
     const product = await prisma.product.findUnique({
       where: { id: data.productId },
-      include: {
-        productSuppliers: {
-          where: { isPreferred: true },
-          include: { supplier: true },
-          take: 1,
-        },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        isActive: true,
       },
     });
     if (!product || !product.isActive) {
       throw new AppError(404, 'Producto no encontrado o inactivo');
     }
 
+    const purchasePrice = Number(data.purchasePrice);
+    const salePrice = Number(data.salePrice);
+
+    if (Number.isNaN(purchasePrice) || purchasePrice <= 0) {
+      throw new AppError(400, 'Precio de compra inválido');
+    }
+    if (Number.isNaN(salePrice) || salePrice <= 0) {
+      throw new AppError(400, 'Precio de venta inválido');
+    }
+
     const orderNumber = await this.generateOrderNumber();
-    const preferredSupplier = product.productSuppliers[0];
 
     const specialOrder = await prisma.$transaction(async (tx) => {
-      let purchaseOrderId: string | undefined;
+      const poNumber = await this.generatePurchaseOrderNumber();
+      const subtotal = purchasePrice * data.quantity;
+      const total = subtotal + shippingCost;
 
-      // Auto-generar OC si hay proveedor preferido
-      if (preferredSupplier) {
-        const poNumber = await this.generatePurchaseOrderNumber();
-        const unitPrice = Number(preferredSupplier.supplierPrice);
-        const subtotal = unitPrice * data.quantity;
-
-        const po = await tx.purchaseOrder.create({
-          data: {
-            orderNumber: poNumber,
-            supplierId: preferredSupplier.supplierId,
-            status: 'ENVIADA',
-            subtotal,
-            tax: 0,
-            total: subtotal,
-            expectedDate: data.estimatedDate,
-            notes: `Generada automáticamente para pedido especial ${orderNumber}`,
-            items: {
-              create: {
-                productId: product.id,
-                productName: product.name,
-                productSku: product.sku,
-                quantity: data.quantity,
-                unitPrice,
-                subtotal,
-              },
+      const purchaseOrder = await tx.purchaseOrder.create({
+        data: {
+          orderNumber: poNumber,
+          supplierId: data.supplierId,
+          status: 'ENVIADA',
+          subtotal,
+          tax: 0,
+          total,
+          shippingCost,
+          expectedDate: data.estimatedDate,
+          paymentTerms: data.supplierPaymentMethod,
+          notes: `Pedido especial ${orderNumber} · Cliente ${data.clientId}`,
+          items: {
+            create: {
+              productId: product.id,
+              productName: product.name,
+              productSku: product.sku,
+              quantity: data.quantity,
+              unitPrice: purchasePrice,
+              subtotal,
             },
           },
-        });
-        purchaseOrderId = po.id;
-      }
+        },
+      });
 
       const order = await tx.specialOrder.create({
         data: {
           orderNumber,
           clientId: data.clientId,
+          supplierId: data.supplierId,
           productId: data.productId,
           quantity: data.quantity,
-          status: purchaseOrderId ? 'ORDEN_GENERADA' : 'PENDIENTE',
+          status: 'ORDEN_GENERADA',
           estimatedDate: data.estimatedDate,
           notes: data.notes,
-          purchaseOrderId,
+          purchaseOrderId: purchaseOrder.id,
+          purchasePrice,
+          salePrice,
+          shippingCost,
+          paymentMethod: data.paymentMethod,
+          supplierPaymentMethod: data.supplierPaymentMethod,
         },
         include: {
           client: {
@@ -109,8 +134,15 @@ export class SpecialOrderService {
             },
           },
           product: { select: { id: true, name: true, sku: true } },
+          supplier: { select: { id: true, name: true, phone: true } },
           purchaseOrder: {
-            select: { id: true, orderNumber: true, status: true },
+            select: {
+              id: true,
+              orderNumber: true,
+              status: true,
+              shippingCost: true,
+              total: true,
+            },
           },
         },
       });
@@ -166,7 +198,7 @@ export class SpecialOrderService {
     }
 
     // Si se entrega al cliente (ENTREGADO), descontar del stock reservado
-    if (data.status === 'ENTREGADO') {
+    if (data.status === 'ENTREGADO' && !order.saleId) {
       const product = await prisma.product.findUnique({
         where: { id: order.productId },
         select: { currentStock: true },
@@ -192,6 +224,30 @@ export class SpecialOrderService {
       }
     }
 
+    if (data.status === 'RECIBIDO' && !order.saleId) {
+      const paymentMethod = order.paymentMethod ?? 'TRANSFERENCIA';
+      const sale = await SaleService.create(
+        {
+          clientId: order.clientId,
+          paymentMethod,
+          notes: `Factura generada automáticamente para pedido especial ${order.orderNumber}`,
+          additionalCharges: Number(order.shippingCost ?? 0),
+          items: [
+            {
+              productId: order.productId,
+              quantity: order.quantity,
+              unitPrice: Number(order.salePrice),
+            },
+          ],
+        },
+        userId
+      );
+
+      updateData.sale = { connect: { id: sale.id } };
+      updateData.status = 'LISTO_CLIENTE';
+      updateData.notifiedAt = new Date();
+    }
+
     const updated = await prisma.specialOrder.update({
       where: { id },
       data: updateData,
@@ -207,8 +263,30 @@ export class SpecialOrderService {
           },
         },
         product: { select: { id: true, name: true, sku: true } },
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
         purchaseOrder: {
-          select: { id: true, orderNumber: true, status: true },
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            shippingCost: true,
+            total: true,
+          },
+        },
+        sale: {
+          select: {
+            id: true,
+            saleNumber: true,
+            total: true,
+            paymentMethod: true,
+            createdAt: true,
+          },
         },
       },
     });
@@ -241,8 +319,29 @@ export class SpecialOrderService {
             },
           },
           product: { select: { id: true, name: true, sku: true, unit: true } },
+          supplier: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+            },
+          },
           purchaseOrder: {
-            select: { id: true, orderNumber: true, status: true },
+            select: {
+              id: true,
+              orderNumber: true,
+              status: true,
+              shippingCost: true,
+              total: true,
+            },
+          },
+          sale: {
+            select: {
+              id: true,
+              saleNumber: true,
+              total: true,
+              createdAt: true,
+            },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -273,8 +372,20 @@ export class SpecialOrderService {
             },
           },
         },
+        supplier: true,
         purchaseOrder: {
           include: { items: true, supplier: true },
+        },
+        sale: {
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: { id: true, name: true, sku: true, unit: true },
+                },
+              },
+            },
+          },
         },
       },
     });

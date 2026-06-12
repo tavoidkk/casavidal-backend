@@ -6,8 +6,20 @@ import { z } from 'zod';
 export const createSpecialOrderSchema = z.object({
   body: z.object({
     clientId: z.string().uuid('Cliente inválido'),
+    supplierId: z.string().uuid('Proveedor inválido'),
     productId: z.string().uuid('Producto inválido'),
     quantity: z.number().int().positive('La cantidad debe ser positiva'),
+    purchasePrice: z.number().min(0, 'Precio de compra inválido'),
+    salePrice: z.number().min(0, 'Precio de venta inválido'),
+    shippingCost: z.number().min(0, 'Costo de envío inválido').optional(),
+    paymentMethod: z.enum([
+      'EFECTIVO',
+      'TRANSFERENCIA',
+      'PUNTO_VENTA',
+      'PAGO_MOVIL',
+      'ZELLE',
+    ]),
+    supplierPaymentMethod: z.string().max(120).optional(),
     estimatedDate: z.string().datetime().optional(),
     notes: z.string().max(500).optional(),
   }),

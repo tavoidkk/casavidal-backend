@@ -33,6 +33,11 @@ export class SaleService {
     }
 
     // Verificar productos y calcular totales
+    const additionalCharges = Number(data.additionalCharges ?? 0);
+    if (additionalCharges < 0 || Number.isNaN(additionalCharges)) {
+      throw new AppError(400, 'Cargos adicionales inválidos');
+    }
+
     const itemsWithProducts = await Promise.all(
       data.items.map(async (item) => {
         const product = await prisma.product.findUnique({
@@ -60,12 +65,16 @@ export class SaleService {
         }
 
         // Precio según categoría del cliente
-        let unitPrice = Number(product.salePrice);
+        let unitPrice = item.unitPrice ?? Number(product.salePrice);
         if (
           (client.category === 'MAYORISTA' || client.category === 'VIP') &&
           product.wholesalePrice
         ) {
-          unitPrice = Number(product.wholesalePrice);
+          unitPrice = item.unitPrice ?? Number(product.wholesalePrice);
+        }
+
+        if (unitPrice <= 0 || Number.isNaN(unitPrice)) {
+          throw new AppError(400, `Precio inválido para el producto ${product.name}`);
         }
 
         return {
@@ -82,7 +91,7 @@ export class SaleService {
 
     const subtotal = itemsWithProducts.reduce((sum, i) => sum + i.subtotal, 0);
     const discount = data.discount || 0;
-    const total = Math.max(0, subtotal - discount);
+    const total = Math.max(0, subtotal - discount + additionalCharges);
 
     const saleNumber = await this.generateSaleNumber();
 

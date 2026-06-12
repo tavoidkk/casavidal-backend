@@ -1,6 +1,7 @@
 export interface CreateSaleItemInput {
   productId: string;
   quantity: number;
+  unitPrice?: number;
 }
 
 export interface CreateSaleInput {
@@ -9,6 +10,7 @@ export interface CreateSaleInput {
   discount?: number; // Descuento global en monto (no porcentaje)
   paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'PAGO_MOVIL' | 'ZELLE';
   notes?: string;
+  additionalCharges?: number;
 }
 
 export interface SaleFilters {

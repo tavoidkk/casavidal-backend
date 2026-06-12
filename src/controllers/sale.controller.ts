@@ -12,6 +12,7 @@ export const createSaleSchema = z.object({
         z.object({
           productId: z.string().uuid('Producto inválido'),
           quantity: z.number().int().positive('La cantidad debe ser positiva'),
+          unitPrice: z.number().min(0).optional(),
         })
       )
       .min(1, 'Debe incluir al menos un producto'),
@@ -24,6 +25,7 @@ export const createSaleSchema = z.object({
       'ZELLE',
     ]),
     notes: z.string().max(500).optional(),
+    additionalCharges: z.number().min(0).optional(),
   }),
 });
 
