@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { NotificationService } from './notification.service';
 
 interface Suggestion {
   id: string;
@@ -234,6 +235,18 @@ export class ClientSuggestionsService {
     await prisma.dismissedSuggestion.create({
       data: { userId, clientId: suggestion.clientId, ruleKey },
     });
+
+    try {
+      await NotificationService.createNotification({
+        userId,
+        type: 'NUEVA_ACTIVIDAD' as any,
+        title: 'Sugerencia aplicada',
+        message: `${suggestion.title}`,
+        link: '/crm',
+      });
+    } catch {
+      // No impedir si falla la notificación
+    }
 
     return activity;
   }

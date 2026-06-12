@@ -129,9 +129,9 @@ export class DashboardService {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(todayStart.getTime() + 86400000);
 
-    const [pendingTasks, todayAppointments] = await Promise.all([
+    const [pendingTasks, todayAppointments, allAppointments] = await Promise.all([
       prisma.activity.count({
-        where: { status: 'PENDIENTE', dueDate: { lte: todayEnd } },
+        where: { status: 'PENDIENTE' },
       }),
       prisma.activity.findMany({
         where: { dueDate: { gte: todayStart, lte: todayEnd } },
@@ -146,9 +146,22 @@ export class DashboardService {
         orderBy: { dueDate: 'asc' },
         take: 10,
       }),
+      prisma.activity.findMany({
+        where: { status: { in: ['PENDIENTE', 'COMPLETADA', 'CANCELADA', 'PERDIDA'] } },
+        select: {
+          id: true,
+          subject: true,
+          type: true,
+          dueDate: true,
+          status: true,
+          client: { select: { firstName: true, lastName: true, companyName: true, clientType: true } },
+        },
+        orderBy: { dueDate: 'desc' },
+        take: 20,
+      }),
     ]);
 
-    return { pendingTasks, todayAppointments };
+    return { pendingTasks, todayAppointments, allAppointments };
   }
 
   // Top clientes por compras totales

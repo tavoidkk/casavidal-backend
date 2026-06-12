@@ -1,10 +1,20 @@
 import { prisma } from '../config/database';
 import { ActivityType } from '@prisma/client';
+import { NotificationService } from './notification.service';
 
 const ONE_HOUR_MS = 3600000;
 
 export class ActivityService {
   // Crear actividad + sincronizar con calendario si tiene fecha
+  private static readonly typeLabels: Record<string, string> = {
+    LLAMADA: 'Llamada',
+    EMAIL: 'Email',
+    REUNION: 'Reunión',
+    SEGUIMIENTO: 'Seguimiento',
+    TAREA: 'Tarea',
+    NOTA: 'Nota',
+  };
+
   static async createActivity(data: {
     clientId: string;
     assignedToId: string;
@@ -13,8 +23,8 @@ export class ActivityService {
     description?: string;
     dueDate?: Date;
   }) {
-    return await prisma.$transaction(async (tx) => {
-      const activity = await tx.activity.create({
+    const activity = await prisma.$transaction(async (tx) => {
+      const act = await tx.activity.create({
         data: {
           clientId: data.clientId,
           assignedToId: data.assignedToId,
@@ -46,15 +56,29 @@ export class ActivityService {
         });
 
         await tx.activity.update({
-          where: { id: activity.id },
+          where: { id: act.id },
           data: { calendarEventId: event.id },
         });
 
-        activity.calendarEventId = event.id;
+        act.calendarEventId = event.id;
       }
 
-      return activity;
+      return act;
     });
+
+    try {
+      await NotificationService.createNotification({
+        userId: data.assignedToId,
+        type: 'NUEVA_ACTIVIDAD' as any,
+        title: 'Nueva actividad',
+        message: `${this.typeLabels[data.type] || data.type}: ${data.subject}`,
+        link: '/crm',
+      });
+    } catch {
+      // No impedir si falla la notificación
+    }
+
+    return activity;
   }
 
   // Obtener actividades de un cliente (Timeline)
