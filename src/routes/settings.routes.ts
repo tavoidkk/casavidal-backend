@@ -6,7 +6,13 @@ import { uploadSettingsLogo } from '../middleware/upload.middleware';
 
 const router = Router();
 
-// Todas las rutas requieren autenticación
+/**
+ * GET /api/settings/rate
+ * Obtener tasa de cambio USD -> Bs (público, sin autenticación)
+ */
+router.get('/rate', SettingsController.getRate);
+
+// Todas las rutas siguientes requieren autenticación
 router.use(authenticate);
 
 /**
@@ -15,13 +21,6 @@ router.use(authenticate);
  * Accesible por todos los usuarios autenticados (necesitan ver algunos datos como currency, taxRate)
  */
 router.get('/', SettingsController.getSettings);
-
-/**
- * GET /api/settings/rate
- * Obtener tasa de cambio USD -> Bs
- * Sin autenticación para que el frontend pueda consultarla libremente
- */
-router.get('/rate', SettingsController.getRate);
 
 /**
  * PUT /api/settings
