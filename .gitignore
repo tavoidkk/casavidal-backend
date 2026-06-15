@@ -9,7 +9,6 @@ dist/
 build/
 
 # Environment
-.env
 .env.local
 
 # IDE
