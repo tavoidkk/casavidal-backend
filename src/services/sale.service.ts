@@ -107,16 +107,68 @@ export class SaleService {
       pointsDiscount = validation.discountAmount;
     }
 
-    const total = Math.max(0, subtotal - discount - pointsDiscount + additionalCharges);
+    const baseTotal = Math.max(0, subtotal - discount - pointsDiscount + additionalCharges);
 
     const saleNumber = await this.generateSaleNumber();
 
     // Determinar moneda y obtener tasa si aplica
     const currency = data.currency || 'USD';
+    const settings = await SettingsService.getSettings();
+    const hasBsPayment = data.payments?.some(p => p.currency === 'BS');
     let usdToBsRateAtSale: number | null = null;
-    if (currency === 'BS') {
-      const settings = await SettingsService.getSettings();
-      usdToBsRateAtSale = settings.usdToBsRate ? Number(settings.usdToBsRate) : null;
+    if (currency === 'BS' || hasBsPayment) {
+      const raw = settings.usdToBsRate;
+      usdToBsRateAtSale = raw !== null && raw !== undefined ? Number(raw) : null;
+      if (!usdToBsRateAtSale || usdToBsRateAtSale <= 0) {
+        throw new AppError(400, 'Debe configurar la tasa de cambio USD → Bs en Ajustes antes de realizar ventas en bolívares');
+      }
+    }
+
+    const taxRate = settings.taxRate ? Number(settings.taxRate) : 0;
+    const taxAmount = taxRate > 0 ? Number((baseTotal * (taxRate / 100)).toFixed(2)) : 0;
+    const total = baseTotal + taxAmount;
+
+    // Preparar datos de pago
+    let paymentData: Array<{
+      paymentMethod: string;
+      currency: string;
+      amount: Prisma.Decimal;
+      amountUsd: Prisma.Decimal;
+      reference?: string;
+    }>;
+
+    if (data.payments && data.payments.length > 0) {
+      const rate = usdToBsRateAtSale ?? 1;
+      paymentData = data.payments.map((p) => {
+        const amountUsd = p.currency === 'USD' ? p.amount : p.amount / rate;
+        return {
+          paymentMethod: p.paymentMethod,
+          currency: p.currency,
+          amount: new Prisma.Decimal(p.amount),
+          amountUsd: new Prisma.Decimal(amountUsd),
+          reference: p.reference,
+        };
+      });
+      const totalUsdPaid = paymentData.reduce((sum, p) => sum + Number(p.amountUsd), 0);
+      const delta = totalUsdPaid - total;
+      if (delta < -0.01) {
+        const breakdown = paymentData.map(p =>
+          `${p.paymentMethod} ${p.currency} ${p.amount} → $${Number(p.amountUsd).toFixed(2)}`
+        ).join('; ');
+        throw new AppError(
+          400,
+          `Pagos incompletos: faltan $${Math.abs(delta).toFixed(2)} (total pendiente $${total.toFixed(2)}). Desglose: ${breakdown}`
+        );
+      }
+    } else {
+      const amountUsd = currency === 'USD' ? total : total / usdToBsRateAtSale!;
+      paymentData = [{
+        paymentMethod: data.paymentMethod!,
+        currency,
+        amount: new Prisma.Decimal(total),
+        amountUsd: new Prisma.Decimal(amountUsd),
+        reference: data.paymentReference,
+      }];
     }
 
     // Crear venta en una transacción
@@ -130,13 +182,22 @@ export class SaleService {
           discount,
           pointsRedeemed,
           pointsDiscount,
-          tax: 0,
+          tax: taxAmount,
           total,
-          paymentMethod: data.paymentMethod,
+          paymentMethod: data.paymentMethod || paymentData[0].paymentMethod as any,
           currency,
           paymentReference: data.paymentReference,
           usdToBsRateAtSale: usdToBsRateAtSale !== null ? new Prisma.Decimal(usdToBsRateAtSale) : null,
           notes: data.notes,
+          payments: {
+            create: paymentData.map((p) => ({
+              paymentMethod: p.paymentMethod as any,
+              currency: p.currency as any,
+              amount: p.amount,
+              amountUsd: p.amountUsd,
+              reference: p.reference,
+            })),
+          },
           items: {
             create: itemsWithProducts.map((item) => ({
               productId: item.productId,
@@ -211,10 +272,11 @@ export class SaleService {
 
       // Actualizar categoría automáticamente
       let newCategory = client.category;
-      if (newTotal >= 50000 && client.category !== 'MAYORISTA') {
-        newCategory = 'VIP';
-      } else if (newTotal >= 10000 && client.category === 'NUEVO') {
+      if (client.purchaseCount === 0) {
         newCategory = 'REGULAR';
+      }
+      if (newTotal > 200 && client.category !== 'MAYORISTA') {
+        newCategory = 'VIP';
       }
 
       const newStage = client.purchaseCount === 0 ? 'GANADO' : undefined;
@@ -389,6 +451,9 @@ export class SaleService {
               product: { select: { id: true, name: true, sku: true } },
             },
           },
+          payments: {
+            select: { id: true, paymentMethod: true, currency: true, amount: true, amountUsd: true, reference: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -415,6 +480,9 @@ export class SaleService {
               select: { id: true, name: true, sku: true, unit: true, image: true },
             },
           },
+        },
+        payments: {
+          select: { id: true, paymentMethod: true, currency: true, amount: true, amountUsd: true, reference: true },
         },
       },
     });

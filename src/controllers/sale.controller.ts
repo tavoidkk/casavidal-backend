@@ -4,6 +4,13 @@ import { successResponse, paginatedResponse } from '../utils/response';
 import { parseOptionalDate, parsePositiveInt } from '../utils/query';
 import { z } from 'zod';
 
+const paymentSplitSchema = z.object({
+  paymentMethod: z.enum(['EFECTIVO', 'TRANSFERENCIA', 'PUNTO_VENTA', 'PAGO_MOVIL', 'ZELLE']),
+  currency: z.enum(['USD', 'BS']),
+  amount: z.number().positive('El monto debe ser positivo'),
+  reference: z.string().max(100).optional(),
+});
+
 export const createSaleSchema = z.object({
   body: z.object({
     clientId: z.string().uuid('Cliente inválido'),
@@ -23,13 +30,17 @@ export const createSaleSchema = z.object({
       'PUNTO_VENTA',
       'PAGO_MOVIL',
       'ZELLE',
-    ]),
+    ]).optional(),
+    payments: z.array(paymentSplitSchema).min(1).optional(),
     notes: z.string().max(500).optional(),
     additionalCharges: z.number().min(0).optional(),
     currency: z.enum(['USD', 'BS']).optional(),
     paymentReference: z.string().max(100).optional(),
     pointsRedeemed: z.number().int().min(0).optional(),
-  }),
+  }).refine(
+    (data) => data.paymentMethod || data.payments,
+    { message: 'Debe especificar un método de pago o una lista de pagos', path: ['paymentMethod'] }
+  ),
 });
 
 export class SaleController {

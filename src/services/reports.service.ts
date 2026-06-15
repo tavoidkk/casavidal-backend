@@ -30,7 +30,15 @@ export class ReportsService {
       byDay[day].total += Number(sale.total);
     }
 
-    return { totalSales: sales.length, totalRevenue, totalDiscount, totalTax, avgTicket, byPaymentMethod, byDay: Object.entries(byDay).map(([date, v]) => ({ date, ...v })), sales };
+    const byPaymentMethodSplit: Record<string, number> = {};
+    const salePayments = await prisma.salePayment.findMany({
+      where: { saleId: { in: sales.map((s) => s.id) } },
+    });
+    for (const sp of salePayments) {
+      byPaymentMethodSplit[sp.paymentMethod] = (byPaymentMethodSplit[sp.paymentMethod] || 0) + Number(sp.amountUsd);
+    }
+
+    return { totalSales: sales.length, totalRevenue, totalDiscount, totalTax, avgTicket, byPaymentMethod, byPaymentMethodSplit, byDay: Object.entries(byDay).map(([date, v]) => ({ date, ...v })), sales };
   }
 
   // 2. Reporte de Inventario / Stock
@@ -247,36 +255,6 @@ export class ReportsService {
     return { totalOrders: total, avgLifecycleDays: completedCount ? Math.round(totalLifecycleDays / completedCount) : 0, byStatus: Object.entries(byStatus).map(([name, count]) => ({ name, count })) };
   }
 
-  // 9. Campañas
-  static async campanas(filters: { dateFrom?: Date; dateTo?: Date; type?: string }) {
-    const where: any = {};
-    if (filters.dateFrom || filters.dateTo) {
-      where.createdAt = {};
-      if (filters.dateFrom) where.createdAt.gte = filters.dateFrom;
-      if (filters.dateTo) where.createdAt.lte = filters.dateTo;
-    }
-    if (filters.type) where.type = filters.type;
-
-    const campaigns = await prisma.campaign.findMany({ where, orderBy: { createdAt: 'desc' } });
-
-    const total = campaigns.length;
-    const byType: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-    let totalSent = 0;
-    let totalOpens = 0;
-    let totalClicks = 0;
-
-    for (const c of campaigns) {
-      byType[c.type] = (byType[c.type] || 0) + 1;
-      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-      totalSent += c.sentCount;
-      totalOpens += c.openCount;
-      totalClicks += c.clickCount;
-    }
-
-    return { totalCampaigns: total, totalSent, totalOpens, totalClicks, avgOpenRate: totalSent ? Number((totalOpens / totalSent * 100).toFixed(1)) : 0, avgClickRate: totalSent ? Number((totalClicks / totalSent * 100).toFixed(1)) : 0, byType: Object.entries(byType).map(([name, count]) => ({ name, count })), byStatus: Object.entries(byStatus).map(([name, count]) => ({ name, count })) };
-  }
-
   // 10. Productividad del equipo
   static async productividad(filters: { dateFrom?: Date; dateTo?: Date; userId?: string }) {
     const userWhere: any = { isActive: true };
@@ -304,29 +282,4 @@ export class ReportsService {
     return { users: result };
   }
 
-  // 11. Dashboard Ejecutivo
-  static async dashboardEjecutivo(filters: { dateFrom?: Date; dateTo?: Date }) {
-    const dateFilter: any = {};
-    if (filters.dateFrom || filters.dateTo) {
-      dateFilter.createdAt = {};
-      if (filters.dateFrom) dateFilter.createdAt.gte = filters.dateFrom;
-      if (filters.dateTo) dateFilter.createdAt.lte = filters.dateTo;
-    }
-
-    const salesAgg = await prisma.sale.aggregate({ where: dateFilter, _sum: { total: true }, _count: true });
-    const salesCount = salesAgg._count;
-    const salesTotal = Number(salesAgg._sum.total || 0);
-
-    const activeClients = await prisma.client.count({ where: { isActive: true } });
-    const newClients = filters.dateFrom || filters.dateTo ? await prisma.client.count({ where: dateFilter }) : await prisma.client.count({ where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } });
-    const allProducts = await prisma.product.findMany({ where: { isActive: true }, select: { currentStock: true, minStock: true } });
-    const lowStock = allProducts.filter((p) => p.currentStock <= p.minStock).length;
-    const pendingOrders = await prisma.specialOrder.count({ where: { status: { notIn: ['ENTREGADO', 'CANCELADO'] } } });
-    const pendingActivities = await prisma.activity.count({ where: { status: 'PENDIENTE' } });
-    const overdueActs = await prisma.activity.count({ where: { status: 'PENDIENTE', dueDate: { lte: new Date() } } });
-
-    const byPaymentMethod = await prisma.sale.groupBy({ by: ['paymentMethod'], where: dateFilter, _sum: { total: true } });
-
-    return { salesTotal, salesCount, avgTicket: salesCount ? salesTotal / salesCount : 0, activeClients, newClients, lowStock, pendingOrders, pendingActivities, overdueActivities: overdueActs, byPaymentMethod: byPaymentMethod.map((p) => ({ method: p.paymentMethod, total: Number(p._sum.total || 0) })) };
-  }
 }

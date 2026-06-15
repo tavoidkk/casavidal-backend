@@ -4,16 +4,24 @@ export interface CreateSaleItemInput {
   unitPrice?: number;
 }
 
+export interface PaymentSplitInput {
+  paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'PAGO_MOVIL' | 'ZELLE';
+  currency: 'USD' | 'BS';
+  amount: number;
+  reference?: string;
+}
+
 export interface CreateSaleInput {
   clientId: string;
   items: CreateSaleItemInput[];
-  discount?: number; // Descuento global en monto (no porcentaje)
-  paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'PAGO_MOVIL' | 'ZELLE';
+  discount?: number;
+  paymentMethod?: 'EFECTIVO' | 'TRANSFERENCIA' | 'PUNTO_VENTA' | 'PAGO_MOVIL' | 'ZELLE';
+  payments?: PaymentSplitInput[];
   notes?: string;
   additionalCharges?: number;
   currency?: 'USD' | 'BS';
   paymentReference?: string;
-  pointsRedeemed?: number; // Puntos de lealtad a canjear
+  pointsRedeemed?: number;
 }
 
 export interface SaleFilters {

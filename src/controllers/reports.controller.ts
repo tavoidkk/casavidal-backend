@@ -32,9 +32,7 @@ export class ReportsController {
         case 'rentabilidad': data = await ReportsService.rentabilidad(filters as any); break;
         case 'proveedores': data = await ReportsService.proveedores(); break;
         case 'pedidos-especiales': data = await ReportsService.pedidosEspeciales(filters); break;
-        case 'campanas': data = await ReportsService.campanas(filters); break;
         case 'productividad': data = await ReportsService.productividad(filters); break;
-        case 'dashboard-ejecutivo': data = await ReportsService.dashboardEjecutivo(filters); break;
         default: res.status(400).json({ error: 'Tipo de reporte invalido' }); return;
       }
 
