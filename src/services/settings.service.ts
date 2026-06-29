@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { Decimal } from '@prisma/client/runtime/library';
+import { env } from '../config/env';
 
 // Tipos para Settings
 export interface UpdateSettingsInput {
@@ -155,6 +156,57 @@ export class SettingsService {
       }
       console.error('Error al actualizar configuración:', error);
       throw new AppError(500, 'Error al actualizar la configuración del sistema');
+    }
+  }
+
+  /**
+   * Obtener la tasa de cambio USD -> Bs desde el API del Banco de Venezuela
+   * y persistirla en la configuración del sistema.
+   * Endpoint: BDV_API_URL (default https://www.bancodevenezuela.com/files/tasas/tasas2.json)
+   * Devuelve la tasa de la sección "mesacambio.bdv.dolares" (string con coma decimal).
+   */
+  static async refreshRateFromBdv() {
+    try {
+      const response = await fetch(env.BDV_API_URL, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(env.BDV_API_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        throw new AppError(502, `El API del BDV respondió con estado ${response.status}`);
+      }
+
+      const data: any = await response.json();
+      const rawRate = data?.mesacambio?.bdv?.dolares;
+
+      if (typeof rawRate !== 'string' && typeof rawRate !== 'number') {
+        throw new AppError(502, 'El API del BDV no devolvió la tasa en el formato esperado');
+      }
+
+      const normalized = String(rawRate).trim().replace(/\./g, '').replace(',', '.');
+      const rate = Number(normalized);
+
+      if (!Number.isFinite(rate) || rate <= 0) {
+        throw new AppError(502, `Tasa inválida devuelta por el BDV: "${rawRate}"`);
+      }
+
+      const updated = await this.updateSettings({ usdToBsRate: rate });
+
+      return {
+        usdToBsRate: Number(updated.usdToBsRate),
+        usdToBsUpdatedAt: updated.usdToBsUpdatedAt,
+        source: 'bdv',
+      };
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+        throw new AppError(504, 'Tiempo de espera agotado al consultar el API del BDV');
+      }
+      console.error('Error al obtener tasa del BDV:', error);
+      throw new AppError(502, 'No se pudo obtener la tasa del Banco de Venezuela');
     }
   }
 

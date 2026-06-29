@@ -79,4 +79,15 @@ router.post(
   SettingsController.uploadLogo
 );
 
+/**
+ * POST /api/settings/rate/refresh
+ * Consultar el API del Banco de Venezuela y actualizar la tasa USD -> Bs
+ * Solo accesible por ADMIN
+ */
+router.post(
+  '/rate/refresh',
+  requireRole('ADMIN'),
+  SettingsController.refreshRate
+);
+
 export default router;
