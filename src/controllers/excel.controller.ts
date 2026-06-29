@@ -107,4 +107,55 @@ export class ExcelController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/excel/template/products
+   * Descargar plantilla de productos
+   */
+  static async downloadProductsTemplate(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const buffer = await ExcelService.generateProductsTemplate();
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="plantilla-productos.xlsx"');
+
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/excel/template/clients
+   * Descargar plantilla de clientes
+   */
+  static async downloadClientsTemplate(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const buffer = await ExcelService.generateClientsTemplate();
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="plantilla-clientes.xlsx"');
+
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/excel/template/suppliers
+   * Descargar plantilla de proveedores
+   */
+  static async downloadSuppliersTemplate(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const buffer = await ExcelService.generateSuppliersTemplate();
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="plantilla-proveedores.xlsx"');
+
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

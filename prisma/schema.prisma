@@ -817,7 +817,7 @@ model Settings {
   signatureUrl   String? // URL de la firma digital (PNG) para PDFs
 
   // Configuración financiera
-  currency String  @default("CLP") // CLP, USD, EUR, etc.
+  currency String  @default("USD") // USD, EUR
   taxRate  Decimal @default(19.00) @db.Decimal(5, 2) // % de IVA
 
   // Tasa de cambio USD -> Bs (Venezuela)

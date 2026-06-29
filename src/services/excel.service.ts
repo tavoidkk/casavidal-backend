@@ -354,4 +354,155 @@ export class ExcelService {
       throw new AppError(500, 'Error al importar proveedores desde Excel');
     }
   }
+
+  /**
+   * Generar plantilla de productos para importación
+   */
+  static async generateProductsTemplate() {
+    const categories = await prisma.category.findMany();
+
+    const data = [
+      {
+        SKU: 'PAINT-LAT-WHI-001',
+        Nombre: 'Pintura Látex Blanco',
+        Categoría: 'Pinturas',
+        'Código de Barras': '7501234567890',
+        Descripción: 'Pintura látex lavable color blanco mate',
+        'Precio Costo': 150.0,
+        'Precio Venta': 250.0,
+        'Precio Mayorista': 220.0,
+        'Stock Actual': 50,
+        'Stock Mínimo': 10,
+        Unidad: 'galón',
+        Activo: 'Sí',
+      },
+      {
+        SKU: 'TOOL-HAMM-001',
+        Nombre: 'Martillo 16oz Profesional',
+        Categoría: 'Herramientas',
+        'Código de Barras': '',
+        Descripción: '',
+        'Precio Costo': 80.0,
+        'Precio Venta': 180.0,
+        'Precio Mayorista': '',
+        'Stock Actual': 25,
+        'Stock Mínimo': 5,
+        Unidad: 'unidad',
+        Activo: 'Sí',
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!freeze'] = { x: 0, y: 1 };
+    ws['!cols'] = [
+      { wch: 24 }, { wch: 30 }, { wch: 16 }, { wch: 18 },
+      { wch: 36 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
+      { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 10 },
+    ];
+
+    const categoriesData = categories.map((c) => ({ 'Categorías disponibles': c.name }));
+    const wsCategories = XLSX.utils.json_to_sheet(categoriesData);
+    wsCategories['!freeze'] = { x: 0, y: 1 };
+    wsCategories['!cols'] = [{ wch: 30 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Productos');
+    XLSX.utils.book_append_sheet(wb, wsCategories, 'Categorías');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return buffer;
+  }
+
+  /**
+   * Generar plantilla de clientes para importación
+   */
+  static async generateClientsTemplate() {
+    const data = [
+      {
+        'Tipo Cliente': 'Natural',
+        Email: 'maria.gonzalez@email.com',
+        RIF: '',
+        'Razón Social': '',
+        Nombre: 'María',
+        Apellido: 'González',
+        CI: 'V-12345678',
+        Teléfono: '04241234567',
+        Dirección: 'Av. 5 de Julio, Casa 123',
+        Ciudad: 'Maracaibo',
+        Estado: 'Zulia',
+        Categoría: 'VIP',
+        'Puntos Lealtad': 500,
+        'Total Compras': 15000,
+        'Cantidad Compras': 25,
+        Activo: 'Sí',
+      },
+      {
+        'Tipo Cliente': 'Jurídico',
+        Email: 'contacto@construccionesxyz.com',
+        RIF: 'J-12345678-9',
+        'Razón Social': 'Construcciones XYZ C.A.',
+        Nombre: 'Carlos',
+        Apellido: '',
+        CI: '',
+        Teléfono: '02611234567',
+        Dirección: 'Calle 77, Edif. Centro, Piso 3',
+        Ciudad: 'Maracaibo',
+        Estado: 'Zulia',
+        Categoría: 'REGULAR',
+        'Puntos Lealtad': 150,
+        'Total Compras': 4500,
+        'Cantidad Compras': 8,
+        Activo: 'Sí',
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!freeze'] = { x: 0, y: 1 };
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 32 }, { wch: 16 }, { wch: 30 },
+      { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 16 },
+      { wch: 36 }, { wch: 20 }, { wch: 14 }, { wch: 14 },
+      { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 10 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return buffer;
+  }
+
+  /**
+   * Generar plantilla de proveedores para importación
+   */
+  static async generateSuppliersTemplate() {
+    const data = [
+      {
+        RIF: 'J-98765432-1',
+        Nombre: 'Distribuidora Ejemplo C.A.',
+        'Persona Contacto': 'Juan Pérez',
+        Email: 'contacto@ejemplo.com',
+        Teléfono: '0412-9876543',
+        Dirección: 'Av. Principal, Local 5',
+        Ciudad: 'Maracaibo',
+        Estado: 'Zulia',
+        'Días Crédito': 30,
+        Activo: 'Sí',
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!freeze'] = { x: 0, y: 1 };
+    ws['!cols'] = [
+      { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 28 },
+      { wch: 16 }, { wch: 30 }, { wch: 18 }, { wch: 14 },
+      { wch: 14 }, { wch: 10 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Proveedores');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    return buffer;
+  }
 }

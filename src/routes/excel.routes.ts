@@ -48,6 +48,27 @@ router.get('/export/clients', requireRole('ADMIN', 'VENDEDOR'), ExcelController.
 router.get('/export/suppliers', requireRole('ADMIN', 'VENDEDOR'), ExcelController.exportSuppliers);
 
 /**
+ * GET /api/excel/template/products
+ * Descargar plantilla de productos
+ * Solo ADMIN
+ */
+router.get('/template/products', requireRole('ADMIN'), ExcelController.downloadProductsTemplate);
+
+/**
+ * GET /api/excel/template/clients
+ * Descargar plantilla de clientes
+ * Solo ADMIN
+ */
+router.get('/template/clients', requireRole('ADMIN'), ExcelController.downloadClientsTemplate);
+
+/**
+ * GET /api/excel/template/suppliers
+ * Descargar plantilla de proveedores
+ * Solo ADMIN
+ */
+router.get('/template/suppliers', requireRole('ADMIN'), ExcelController.downloadSuppliersTemplate);
+
+/**
  * POST /api/excel/import/products
  * Importar productos desde Excel
  * Solo ADMIN puede importar

@@ -17,7 +17,7 @@ const updateSettingsSchema = z.object({
     signatureUrl: z.string().optional().nullable(),
     
     // Configuración financiera
-    currency: z.enum(['CLP', 'USD', 'EUR', 'ARS', 'MXN', 'COP', 'PEN', 'BRL'], {
+    currency: z.enum(['USD', 'EUR'], {
       errorMap: () => ({ message: 'Moneda no válida' })
     }).optional(),
     taxRate: z.preprocess(

@@ -50,7 +50,7 @@ export class SettingsService {
         settings = await prisma.settings.create({
           data: {
             companyName: 'Casa Vidal',
-            currency: 'CLP',
+            currency: 'USD',
             taxRate: new Decimal(19.00),
             lowStockThreshold: 10,
             defaultPaymentTerm: 30,
@@ -112,7 +112,7 @@ export class SettingsService {
             companyAddress: data.companyAddress,
             companyLogo: data.companyLogo,
             signatureUrl: data.signatureUrl !== undefined ? data.signatureUrl : null,
-            currency: data.currency || 'CLP',
+            currency: data.currency || 'USD',
             taxRate: data.taxRate !== undefined ? new Decimal(data.taxRate) : new Decimal(19.00),
             lowStockThreshold: data.lowStockThreshold || 10,
             defaultPaymentTerm: data.defaultPaymentTerm || 30,
@@ -236,7 +236,7 @@ export class SettingsService {
           companyAddress: null,
           companyLogo: null,
           signatureUrl: null,
-          currency: 'CLP',
+          currency: 'USD',
           taxRate: new Decimal(19.00),
           lowStockThreshold: 10,
           defaultPaymentTerm: 30,
