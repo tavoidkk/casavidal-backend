@@ -814,6 +814,7 @@ model Settings {
   companyPhone   String?
   companyAddress String?
   companyLogo    String? // URL o base64 del logo
+  signatureUrl   String? // URL de la firma digital (PNG) para PDFs
 
   // Configuración financiera
   currency String  @default("CLP") // CLP, USD, EUR, etc.

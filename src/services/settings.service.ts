@@ -11,6 +11,7 @@ export interface UpdateSettingsInput {
   companyPhone?: string;
   companyAddress?: string;
   companyLogo?: string;
+  signatureUrl?: string | null;
   
   // Configuración financiera
   currency?: string;
@@ -110,6 +111,7 @@ export class SettingsService {
             companyPhone: data.companyPhone,
             companyAddress: data.companyAddress,
             companyLogo: data.companyLogo,
+            signatureUrl: data.signatureUrl !== undefined ? data.signatureUrl : null,
             currency: data.currency || 'CLP',
             taxRate: data.taxRate !== undefined ? new Decimal(data.taxRate) : new Decimal(19.00),
             lowStockThreshold: data.lowStockThreshold || 10,
@@ -130,6 +132,7 @@ export class SettingsService {
         if (data.companyPhone !== undefined) updateData.companyPhone = data.companyPhone;
         if (data.companyAddress !== undefined) updateData.companyAddress = data.companyAddress;
         if (data.companyLogo !== undefined) updateData.companyLogo = data.companyLogo;
+        if (data.signatureUrl !== undefined) updateData.signatureUrl = data.signatureUrl;
         if (data.currency !== undefined) updateData.currency = data.currency;
         if (data.taxRate !== undefined) updateData.taxRate = new Decimal(data.taxRate);
         if (data.lowStockThreshold !== undefined) updateData.lowStockThreshold = data.lowStockThreshold;
@@ -232,6 +235,7 @@ export class SettingsService {
           companyPhone: null,
           companyAddress: null,
           companyLogo: null,
+          signatureUrl: null,
           currency: 'CLP',
           taxRate: new Decimal(19.00),
           lowStockThreshold: 10,
@@ -393,6 +397,7 @@ export class SettingsService {
                 companyPhone: data.settings.companyPhone,
                 companyAddress: data.settings.companyAddress,
                 companyLogo: data.settings.companyLogo,
+                signatureUrl: data.settings.signatureUrl,
                 currency: data.settings.currency,
                 taxRate: data.settings.taxRate,
                 lowStockThreshold: data.settings.lowStockThreshold,

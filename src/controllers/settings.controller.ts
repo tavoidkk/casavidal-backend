@@ -14,6 +14,7 @@ const updateSettingsSchema = z.object({
     companyPhone: z.string().max(20, 'El teléfono es muy largo').optional().nullable(),
     companyAddress: z.string().max(500, 'La dirección es muy larga').optional().nullable(),
     companyLogo: z.string().optional().nullable(),
+    signatureUrl: z.string().optional().nullable(),
     
     // Configuración financiera
     currency: z.enum(['CLP', 'USD', 'EUR', 'ARS', 'MXN', 'COP', 'PEN', 'BRL'], {
@@ -141,6 +142,26 @@ export class SettingsController {
 
       const logoUrl = `/uploads/settings/${file.filename}`;
       return successResponse(res, { url: logoUrl }, 'Logo subido exitosamente');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/settings/signature
+   * Subir firma digital (PNG) de la compañía
+   * Solo accesible por ADMIN
+   */
+  static async uploadSignature(req: Request, res: Response, next: NextFunction) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, error: 'No se proporcionó ningún archivo' });
+      }
+
+      const signatureUrl = `/uploads/settings/${file.filename}`;
+      await SettingsService.updateSettings({ signatureUrl });
+      return successResponse(res, { url: signatureUrl }, 'Firma digital guardada exitosamente');
     } catch (error) {
       next(error);
     }

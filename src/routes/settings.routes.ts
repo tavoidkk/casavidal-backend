@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { SettingsController, settingsSchemas } from '../controllers/settings.controller';
 import { authenticate, requireRole } from '../middleware/authMiddleware';
 import { validate } from '../middleware/validation.middleware';
-import { uploadSettingsLogo } from '../middleware/upload.middleware';
+import { uploadSettingsLogo, uploadSettingsSignature } from '../middleware/upload.middleware';
 
 const router = Router();
 
@@ -77,6 +77,18 @@ router.post(
   requireRole('ADMIN'),
   uploadSettingsLogo.single('logo'),
   SettingsController.uploadLogo
+);
+
+/**
+ * POST /api/settings/signature
+ * Subir firma digital (PNG) de la compañía
+ * Solo ADMIN puede subir firma
+ */
+router.post(
+  '/signature',
+  requireRole('ADMIN'),
+  uploadSettingsSignature.single('signature'),
+  SettingsController.uploadSignature
 );
 
 /**
