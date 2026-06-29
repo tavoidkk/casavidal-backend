@@ -15,8 +15,8 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
   OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY es requerida para funciones de IA'),
   OPENROUTER_MODEL: z.string().default('deepseek/deepseek-chat'),
-  BDV_API_URL: z.string().url().default('https://www.bancodevenezuela.com/files/tasas/tasas2.json'),
-  BDV_API_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  DOLARAPI_URL: z.string().url().default('https://ve.dolarapi.com/v1/dolares/oficial'),
+  DOLARAPI_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -163,53 +163,48 @@ export class SettingsService {
   }
 
   /**
-   * Obtener la tasa de cambio USD -> Bs desde el API del Banco de Venezuela
+   * Obtener la tasa de cambio USD -> Bs desde DolarApi (ve.dolarapi.com)
    * y persistirla en la configuración del sistema.
-   * Endpoint: BDV_API_URL (default https://www.bancodevenezuela.com/files/tasas/tasas2.json)
-   * Devuelve la tasa de la sección "mesacambio.bdv.dolares" (string con coma decimal).
+   * Endpoint: DOLARAPI_URL (default https://ve.dolarapi.com/v1/dolares/oficial)
+   * Devuelve la tasa del campo "promedio" (number).
    */
-  static async refreshRateFromBdv() {
+  static async refreshRateFromDolarApi() {
     try {
-      const response = await fetch(env.BDV_API_URL, {
+      const response = await fetch(env.DOLARAPI_URL, {
         method: 'GET',
         headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(env.BDV_API_TIMEOUT_MS),
+        signal: AbortSignal.timeout(env.DOLARAPI_TIMEOUT_MS),
       });
 
       if (!response.ok) {
-        throw new AppError(502, `El API del BDV respondió con estado ${response.status}`);
+        throw new AppError(502, `DolarApi respondió con estado ${response.status}`);
       }
 
       const data: any = await response.json();
-      const rawRate = data?.mesacambio?.bdv?.dolares;
 
-      if (typeof rawRate !== 'string' && typeof rawRate !== 'number') {
-        throw new AppError(502, 'El API del BDV no devolvió la tasa en el formato esperado');
+      if (typeof data.promedio !== 'number' || data.promedio <= 0) {
+        throw new AppError(502, `Tasa inválida devuelta por DolarApi: "${data.promedio}"`);
       }
 
-      const normalized = String(rawRate).trim().replace(/\./g, '').replace(',', '.');
-      const rate = Number(normalized);
-
-      if (!Number.isFinite(rate) || rate <= 0) {
-        throw new AppError(502, `Tasa inválida devuelta por el BDV: "${rawRate}"`);
-      }
+      const rate = data.promedio;
+      const apiDate = data.fechaActualizacion ? new Date(data.fechaActualizacion) : undefined;
 
       const updated = await this.updateSettings({ usdToBsRate: rate });
 
       return {
         usdToBsRate: Number(updated.usdToBsRate),
-        usdToBsUpdatedAt: updated.usdToBsUpdatedAt,
-        source: 'bdv',
+        usdToBsUpdatedAt: apiDate?.toISOString() || updated.usdToBsUpdatedAt,
+        source: 'dolarapi',
       };
     } catch (error: any) {
       if (error instanceof AppError) {
         throw error;
       }
       if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
-        throw new AppError(504, 'Tiempo de espera agotado al consultar el API del BDV');
+        throw new AppError(504, 'Tiempo de espera agotado al consultar DolarApi');
       }
-      console.error('Error al obtener tasa del BDV:', error);
-      throw new AppError(502, 'No se pudo obtener la tasa del Banco de Venezuela');
+      console.error('Error al obtener tasa de DolarApi:', error);
+      throw new AppError(502, 'No se pudo obtener la tasa desde DolarApi');
     }
   }
 

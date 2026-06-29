@@ -185,14 +185,14 @@ export class SettingsController {
 
   /**
    * POST /api/settings/rate/refresh
-   * Consultar el API del Banco de Venezuela, obtener la tasa USD->Bs
+   * Consultar DolarApi, obtener la tasa USD->Bs
    * y persistirla en la configuración del sistema.
    * Solo accesible por ADMIN.
    */
   static async refreshRate(_req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await SettingsService.refreshRateFromBdv();
-      return successResponse(res, result, 'Tasa actualizada desde el Banco de Venezuela');
+      const result = await SettingsService.refreshRateFromDolarApi();
+      return successResponse(res, result, 'Tasa actualizada desde DolarApi');
     } catch (error) {
       next(error);
     }
