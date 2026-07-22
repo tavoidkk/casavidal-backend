@@ -622,6 +622,8 @@ enum ActivityType {
   NOTA
   TAREA
   SEGUIMIENTO
+  OFERTA
+  RECOMENDACION
 }
 
 enum ActivityStatus {

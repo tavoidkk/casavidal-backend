@@ -1,22 +1,34 @@
 import { prisma } from '../config/database';
 import { AIService } from './ai.service';
+import { Prisma } from '@prisma/client';
 
 const SYSTEM_PROMPT = `Eres "Asistente CasaVidal", un experto en ferretería, construcción y operaciones del sistema de gestión.
 
-PUEDES consultar datos reales del sistema usando las herramientas disponibles. Cuando un usuario pregunte por:
-- Cantidad de clientes, productos, ventas → usa las herramientas stats
-- Información de un cliente específico → usa search_clients o get_client_info
-- Productos, stock, precios → usa search_products
-- Ventas, ingresos → usa get_sales_stats
-- Pedidos pendientes → usa get_pending_orders
-- Actividades de un cliente → usa get_client_activities
-- Productos con stock bajo → usa get_low_stock
+REGLAS IMPORTANTES SOBRE CONSULTAS A LA BASE DE DATOS:
+- SIEMPRE que el usuario pregunte por productos, clientes, ventas, stock o cualquier dato del sistema, DEBES usar las herramientas disponibles. NO respondas con información inventada.
+- Si una herramienta devuelve resultados (count > 0), USA esa información. NO digas que no encontraste datos.
+- Si una herramienta devuelve count = 0, dilo honestamente pero ofrece alternativas (ej: "¿puedes darme más detalles?").
 
-Importante:
+CUANDO BUSCAR PRODUCTOS:
+- Si preguntan "qué bombillos tienes" o "tienes bombillas disponibles", USA la herramienta search_products con el término relevante (ej: "bombillo").
+- Si preguntan por un producto específico (ej: "Bombillo LED 9W"), búscalo por nombre.
+- La herramienta ya hace búsqueda case-insensitive y por palabras parciales.
+
+CUANDO BUSCAR CLIENTES:
+- Si preguntan por un cliente, USA search_clients con el nombre o apellido.
+- Si preguntan "cuántas compras ha hecho María González", PRIMERO busca al cliente con search_clients, LUEGO usa get_client_info con su ID.
+- La herramienta busca por nombre, apellido, email, teléfono o documento.
+
+ESTADÍSTICAS Y REPORTES:
+- Para "cuántos clientes tenemos" → get_system_stats
+- Para ventas de hoy/esta semana → get_sales_stats con days=1 o 7
+- Para stock bajo → get_low_stock_products
+
+ESTILO:
 - Siempre responde en español, amable y profesional
-- Si no encuentras datos con las herramientas, dilo honestamente
-- Para crear o modificar datos, confirma siempre con el usuario antes
-- No inventes información que no puedas verificar con las herramientas`;
+- Sé conciso pero informativo
+- Cuando listes productos, incluye nombre, SKU, precio y stock
+- Si encuentras datos, preséntalos de forma clara y útil`;
 
 const TOOLS = [
   {
@@ -130,33 +142,47 @@ async function executeTool(name: string, args: any): Promise<string> {
   try {
     switch (name) {
       case 'get_system_stats': {
-        const [clients, products, sales, lowStock, pendingOrders] = await Promise.all([
+        const lowStockResult = await prisma.$queryRaw<Array<{ count: number }>>`
+          SELECT COUNT(*)::int as count
+          FROM "Product"
+          WHERE "isActive" = true AND "currentStock" <= "minStock"
+        `;
+        const [clients, products, sales, pendingOrders] = await Promise.all([
           prisma.client.count({ where: { isActive: true } }),
           prisma.product.count({ where: { isActive: true } }),
           prisma.sale.count({
             where: { createdAt: { gte: new Date(Date.now() - 86400000) } },
           }),
-          prisma.product.count({ where: { isActive: true, currentStock: { lte: prisma.product.fields.minStock } } }),
           prisma.specialOrder.count({ where: { status: { notIn: ['ENTREGADO', 'CANCELADO'] } } }),
         ]);
+        const lowStock = Number(lowStockResult[0]?.count || 0);
         return JSON.stringify({ activeClients: clients, totalProducts: products, salesToday: sales, lowStockProducts: lowStock, pendingOrders });
       }
 
       case 'search_clients': {
         const { query } = args;
+        const normalizedQuery = query.trim();
+        if (!normalizedQuery) {
+          return JSON.stringify({ count: 0, clients: [], message: 'Proporciona un término de búsqueda válido' });
+        }
+        const searchTerms = normalizedQuery.split(/\s+/).filter(t => t.length > 0);
+        const orConditions: any[] = [];
+        for (const term of searchTerms) {
+          orConditions.push(
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { companyName: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+            { phone: { contains: term, mode: 'insensitive' } },
+            { document: { contains: term, mode: 'insensitive' } }
+          );
+        }
         const clients = await prisma.client.findMany({
           where: {
             isActive: true,
-            OR: [
-              { firstName: { contains: query, mode: 'insensitive' } },
-              { lastName: { contains: query, mode: 'insensitive' } },
-              { companyName: { contains: query, mode: 'insensitive' } },
-              { email: { contains: query, mode: 'insensitive' } },
-              { phone: { contains: query, mode: 'insensitive' } },
-              { document: { contains: query, mode: 'insensitive' } },
-            ],
+            OR: orConditions,
           },
-          select: { id: true, firstName: true, lastName: true, companyName: true, clientType: true, email: true, phone: true, category: true, stage: true },
+          select: { id: true, firstName: true, lastName: true, companyName: true, clientType: true, email: true, phone: true, category: true, stage: true, document: true },
           take: 10,
         });
         return JSON.stringify({ count: clients.length, clients });
@@ -189,36 +215,50 @@ async function executeTool(name: string, args: any): Promise<string> {
 
       case 'search_products': {
         const { query } = args;
+        const normalizedQuery = query.trim();
+        if (!normalizedQuery) {
+          return JSON.stringify({ count: 0, products: [], message: 'Proporciona un término de búsqueda válido' });
+        }
+        const searchTerms = normalizedQuery.split(/\s+/).filter(t => t.length > 0);
+        const orConditions: any[] = [];
+        for (const term of searchTerms) {
+          orConditions.push(
+            { name: { contains: term, mode: 'insensitive' } },
+            { sku: { contains: term, mode: 'insensitive' } },
+            { barcode: { contains: term, mode: 'insensitive' } }
+          );
+        }
         const products = await prisma.product.findMany({
           where: {
             isActive: true,
-            OR: [
-              { name: { contains: query, mode: 'insensitive' } },
-              { sku: { contains: query, mode: 'insensitive' } },
-              { barcode: { contains: query, mode: 'insensitive' } },
-            ],
+            OR: orConditions,
           },
           select: { id: true, name: true, sku: true, salePrice: true, currentStock: true, minStock: true, category: { select: { name: true } } },
-          take: 10,
+          orderBy: { name: 'asc' },
+          take: 15,
         });
         return JSON.stringify({ count: products.length, products });
       }
 
       case 'get_low_stock_products': {
         const { onlyOutOfStock } = args || {};
-        const where: any = { isActive: true };
-        if (onlyOutOfStock) {
-          where.currentStock = 0;
-        } else {
-          where.currentStock = { lte: prisma.product.fields.minStock };
-        }
-        const products = await prisma.product.findMany({
-          where,
-          select: { id: true, name: true, sku: true, currentStock: true, minStock: true, category: { select: { name: true } } },
-          orderBy: { currentStock: 'asc' },
-          take: 20,
-        });
-        return JSON.stringify({ count: products.length, products });
+        const products = await prisma.$queryRaw<Array<any>>`
+          SELECT p.id, p.name, p.sku, p."currentStock", p."minStock", c.name as "categoryName"
+          FROM "Product" p
+          LEFT JOIN "Category" c ON c.id = p."categoryId"
+          WHERE p."isActive" = true
+            ${onlyOutOfStock ? Prisma.sql`AND p."currentStock" = 0` : Prisma.sql`AND (p."currentStock" = 0 OR p."currentStock" <= p."minStock")`}
+          ORDER BY p."currentStock" ASC
+          LIMIT 20
+        `;
+        return JSON.stringify({ count: products.length, products: products.map(p => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          currentStock: p.currentStock,
+          minStock: p.minStock,
+          category: { name: p.categoryName },
+        })) });
       }
 
       case 'get_sales_stats': {

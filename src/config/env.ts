@@ -10,6 +10,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  BACKEND_URL: z.string().url().default('http://localhost:3000'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.string().url().optional(),
@@ -17,6 +18,9 @@ const envSchema = z.object({
   OPENROUTER_MODEL: z.string().default('deepseek/deepseek-chat'),
   DOLARAPI_URL: z.string().url().default('https://ve.dolarapi.com/v1/dolares/oficial'),
   DOLARAPI_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY es requerida'),
+  COMPANY_NAME: z.string().default('Casa Vidal'),
+  COMPANY_LOGO_URL: z.string().url().default('https://resend.com/static/logo.png'),
 });
 
 export type Env = z.infer<typeof envSchema>;

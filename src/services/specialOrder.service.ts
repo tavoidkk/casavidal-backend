@@ -7,6 +7,7 @@ import {
 } from '../types/specialOrder.types';
 import { Prisma } from '@prisma/client';
 import { SaleService } from './sale.service';
+import { EmailService } from './email.service';
 
 export class SpecialOrderService {
   private static async generateOrderNumber(): Promise<string> {
@@ -158,8 +159,49 @@ export class SpecialOrderService {
     data: UpdateSpecialOrderStatusInput,
     userId: string
   ) {
-    const order = await prisma.specialOrder.findUnique({ where: { id } });
+    const order = await prisma.specialOrder.findUnique({ 
+      where: { id },
+      include: {
+        client: {
+          select: {
+            id: true,
+            clientType: true,
+            firstName: true,
+            lastName: true,
+            companyName: true,
+            phone: true,
+            email: true,
+          },
+        },
+        product: { select: { id: true, name: true, sku: true } },
+        supplier: { select: { id: true, name: true, phone: true } },
+        purchaseOrder: {
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            shippingCost: true,
+            total: true,
+          },
+        },
+        sale: {
+          select: {
+            id: true,
+            saleNumber: true,
+            total: true,
+            paymentMethod: true,
+            createdAt: true,
+            payments: {
+              select: { amountUsd: true },
+            },
+          },
+        },
+      },
+    });
+    
     if (!order) throw new AppError(404, 'Pedido especial no encontrado');
+
+    const wasReadyForClient = order.status === 'LISTO_CLIENTE';
 
     const updateData: Prisma.SpecialOrderUpdateInput = {
       status: data.status,
@@ -260,6 +302,7 @@ export class SpecialOrderService {
             lastName: true,
             companyName: true,
             phone: true,
+            email: true,
           },
         },
         product: { select: { id: true, name: true, sku: true } },
@@ -286,10 +329,41 @@ export class SpecialOrderService {
             total: true,
             paymentMethod: true,
             createdAt: true,
+            payments: {
+              select: { amountUsd: true },
+            },
           },
         },
       },
     });
+
+    // Enviar email cuando el pedido está listo para el cliente
+    if (updated.status === 'LISTO_CLIENTE' && updated.client?.email && !wasReadyForClient) {
+      const salePriceNum = updated.salePrice ? Number(updated.salePrice) : 0;
+      const subtotal = salePriceNum * updated.quantity;
+      const shippingCost = updated.shippingCost ? Number(updated.shippingCost) : 0;
+      const totalPayable = subtotal + shippingCost;
+      const paidAmount = updated.sale?.payments?.reduce((sum, p) => sum + Number(p.amountUsd || 0), 0) || 0;
+      const balance = Math.max(0, totalPayable - paidAmount);
+
+      await EmailService.sendSpecialOrderReadyEmail(updated.client.email, {
+        orderNumber: updated.orderNumber,
+        clientName: updated.client.clientType === 'JURIDICO'
+          ? updated.client.companyName || 'Cliente'
+          : `${updated.client.firstName || ''} ${updated.client.lastName || ''}`.trim(),
+        clientType: updated.client.clientType,
+        productName: updated.product?.name || 'Producto',
+        quantity: updated.quantity,
+        total: subtotal,
+        shippingCost: shippingCost > 0 ? shippingCost : null,
+        paidAmount,
+        balance,
+        invoiceUrl: updated.sale?.id ? `${process.env.BACKEND_URL}/api/sales/public/${updated.sale.id}/invoice` : undefined,
+        companyName: process.env.COMPANY_NAME,
+      }).catch((err) => {
+        console.error('Error enviando email de pedido especial:', err);
+      });
+    }
 
     return updated;
   }

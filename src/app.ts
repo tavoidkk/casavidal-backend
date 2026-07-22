@@ -30,6 +30,7 @@ import reportsRoutes from './routes/reports.routes';
 import chatRoutes from './routes/chat.routes';
 import salesAssistantRoutes from './routes/sales-assistant.routes';
 import purchaseOrderRoutes from './routes/purchaseOrder.routes';
+import publicInvoiceRoutes from './routes/publicInvoice.routes';
 
 const app = express();
 
@@ -94,6 +95,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/sales-assistant', salesAssistantRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/sales', publicInvoiceRoutes);
 
 // Error handling
 app.use(notFound);

@@ -6,12 +6,15 @@ interface Suggestion {
   clientId: string;
   clientName: string;
   clientCategory: string;
-  type: 'LLAMADA' | 'EMAIL' | 'REUNION' | 'SEGUIMIENTO' | 'TAREA';
+  type: 'LLAMADA' | 'EMAIL' | 'REUNION' | 'SEGUIMIENTO' | 'TAREA' | 'OFERTA' | 'RECOMENDACION';
   title: string;
   description: string;
   reason: string;
   priority: number;
   ruleKey: string;
+  aiGenerated?: boolean;
+  productId?: string;
+  discountPercent?: number;
 }
 
 export class ClientSuggestionsService {
@@ -166,6 +169,98 @@ export class ClientSuggestionsService {
               ruleKey: key,
             });
           }
+        }
+      }
+
+      // Regla 6.1: Contactar al cliente después de su compra para verificar satisfacción
+      const recentSale = await prisma.sale.findFirst({
+        where: {
+          clientId: client.id,
+          createdAt: { gte: new Date(now.getTime() - 3 * 86400000) },
+        },
+      });
+
+      if (recentSale) {
+        const key = 'POST_PURCHASE_CONTACT';
+        if (!dismissedSet.has(`${client.id}:${key}`)) {
+          allSuggestions.push({
+            id: `${client.id}:${key}`,
+            clientId: client.id,
+            clientName,
+            clientCategory: client.category,
+            type: 'LLAMADA',
+            title: 'Verificar satisfacción del cliente',
+            description: `"${clientName}" realizó una compra hace poco. Llamar para confirmar que recibió el producto correctamente y validar su satisfacción. Esta llamada ayuda a fidelizar y detectar posibles problemas a tiempo.`,
+            reason: 'Seguimiento post-venta',
+            priority: 85,
+            ruleKey: key,
+          });
+        }
+      }
+
+      // Regla 6.2: Oferta para clientes de alto valor (> $200 gastados)
+      const daysSinceLastPurchase = client.lastPurchaseAt 
+        ? Math.floor((now.getTime() - new Date(client.lastPurchaseAt).getTime()) / 86400000) 
+        : 999;
+
+      const totalPurchasesNumber = client.totalPurchases ? Number(client.totalPurchases) : 0;
+      if (totalPurchasesNumber > 200 && daysSinceLastPurchase < 30) {
+        const key = 'HIGH_VALUE_OFFER';
+        if (!dismissedSet.has(`${client.id}:${key}`)) {
+          allSuggestions.push({
+            id: `${client.id}:${key}`,
+            clientId: client.id,
+            clientName,
+            clientCategory: client.category,
+            type: 'OFERTA',
+            title: 'Oferta especial para ti',
+            description: `Como agradecimiento por tus compras (${client.purchaseCount} compras, $${totalPurchasesNumber}), te ofrecemos un 15% de descuento en tu próxima compra.`,
+            reason: `Cliente valor alto: $${totalPurchasesNumber}`,
+            priority: 85,
+            ruleKey: key,
+            discountPercent: 15,
+          });
+        }
+      }
+
+      // Regla 6.3: Reposición de productos con bajo stock - buscamos ventas recientes del cliente
+      const recentSalesWithItems = await prisma.sale.findMany({
+        where: {
+          clientId: client.id,
+          createdAt: { gte: new Date(now.getTime() - 30 * 86400000) },
+        },
+        include: {
+          items: {
+            include: { product: { select: { name: true, currentStock: true } } },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+
+      const lowStockItems = recentSalesWithItems
+        .flatMap(sale => sale.items)
+        .filter(item => item.product.currentStock <= 5);
+
+      if (lowStockItems.length > 0) {
+        const key = 'LOW_STOCK_RECOMMENDATION';
+        if (!dismissedSet.has(`${client.id}:${key}`)) {
+          const productNames = lowStockItems
+            .map(item => item.product.name)
+            .filter((name, index, self) => self.indexOf(name) === index)
+            .join(', ');
+          allSuggestions.push({
+            id: `${client.id}:${key}`,
+            clientId: client.id,
+            clientName,
+            clientCategory: client.category,
+            type: 'RECOMENDACION',
+            title: 'Reposición de productos',
+            description: `Los siguientes productos están con bajo stock: ${productNames}. Considera hacer una nueva compra.`,
+            reason: 'Productos con bajo stock',
+            priority: 65,
+            ruleKey: key,
+          });
         }
       }
     }

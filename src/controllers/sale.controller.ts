@@ -100,4 +100,34 @@ export class SaleController {
       next(error);
     }
   }
+
+  // GET /api/sales/:id/invoice
+  static async downloadInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const sale = await SaleService.findById(req.params.id);
+      const pdf = await SaleService.generateInvoicePDF(sale);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="Factura-${sale.saleNumber}.pdf"`,
+      });
+      res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /api/sales/public/:id/invoice - Pública para clientes desde email
+  static async downloadInvoicePublic(req: Request, res: Response, next: NextFunction) {
+    try {
+      const sale = await SaleService.findById(req.params.id);
+      const pdf = await SaleService.generateInvoicePDF(sale);
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="Factura-${sale.saleNumber}.pdf"`,
+      });
+      res.send(pdf);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -7,6 +7,17 @@ import { NotificationService } from './notification.service';
 import { SettingsService } from './settings.service';
 import { PointsService } from './points.service';
 
+const PDFColors = {
+  primary: [50, 102, 60] as [number, number, number],
+  primaryDark: [37, 75, 45] as [number, number, number],
+  primaryLight: [236, 243, 238] as [number, number, number],
+  dark: [30, 41, 59] as [number, number, number],
+  grayText: [100, 116, 139] as [number, number, number],
+  amber: [200, 124, 0] as [number, number, number],
+  green: [22, 163, 74] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+};
+
 export class SaleService {
   // Genera número de venta: VTA-20250101-00001
   private static async generateSaleNumber(): Promise<string> {
@@ -538,5 +549,156 @@ export class SaleService {
         count: totalSales._count,
       },
     };
+  }
+
+  static async generateInvoicePDF(sale: {
+    id: string;
+    saleNumber: string;
+    createdAt: Date;
+    total: Prisma.Decimal;
+    tax: Prisma.Decimal;
+    currency: string;
+    usdToBsRateAtSale: Prisma.Decimal | null;
+    client: {
+      firstName: string | null;
+      lastName: string | null;
+      companyName: string | null;
+      clientType: string;
+      phone: string | null;
+    };
+    seller: { firstName: string; lastName: string };
+    items: { product: { name: string; sku: string }; quantity: number; unitPrice: number; subtotal: number }[];
+    payments: { paymentMethod: string; currency: string; amount: Prisma.Decimal; amountUsd: Prisma.Decimal; reference?: string }[];
+    notes?: string | null;
+  }): Promise<Buffer> {
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50, size: 'letter' });
+    const chunks: Buffer[] = [];
+
+    return new Promise((resolve, reject) => {
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const total = Number(sale.total);
+      const tax = Number(sale.tax);
+      const usdToBsRateAtSale = sale.usdToBsRateAtSale ? Number(sale.usdToBsRateAtSale) : 0;
+
+      const dateStr = new Date(sale.createdAt).toLocaleDateString('es-VE', {
+        year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+
+      doc.rect(0, 0, 612, 80).fill(...PDFColors.primary);
+
+      doc.fillColor('white').fontSize(20).font('Helvetica-Bold').text('CASAVIDAL', 50, 20);
+      doc.fillColor('white').fontSize(10).font('Helvetica').text('Ferretería Integral', 50, 38);
+
+      doc.fillColor('white').fontSize(16).font('Helvetica-Bold').text('FACTURA', 500, 22, { align: 'right' });
+      doc.fillColor('white').fontSize(12).font('Helvetica').text(sale.saleNumber, 500, 40, { align: 'right' });
+      doc.fillColor('white').fontSize(10).font('Helvetica').text(`Fecha: ${dateStr}`, 500, 55, { align: 'right' });
+
+      const clientName = sale.client.clientType === 'JURIDICO'
+        ? (sale.client.companyName || 'Sin nombre')
+        : `${sale.client.firstName || ''} ${sale.client.lastName || ''}`.trim() || 'Sin nombre';
+
+      const leftX = 50;
+      const rightX = 500;
+
+      doc.fillColor(...PDFColors.primaryDark).fontSize(12).font('Helvetica-Bold').text('DATOS DEL CLIENTE', leftX, 110);
+      doc.fillColor(...PDFColors.dark).fontSize(10).font('Helvetica').text(`Nombre: ${clientName}`, leftX, 125);
+      doc.text(`Teléfono: ${sale.client.phone || '—'}`, leftX, 140);
+      doc.text(`Vendedor: ${sale.seller.firstName} ${sale.seller.lastName}`, leftX, 155);
+      doc.text(`RIF: J-30999631-2`, rightX, 125, { align: 'right' });
+
+      doc.moveTo(leftX, 180).lineTo(rightX, 180).stroke();
+
+      doc.fontSize(11).font('Helvetica-Bold').text('Producto', leftX, 200);
+      doc.text('SKU', 250, 200);
+      doc.text('Cant.', 350, 200);
+      doc.text('P. Unit.', 420, 200);
+      doc.text('Subtotal', 490, 200, { align: 'right' });
+
+      let yPos = 215;
+      sale.items.forEach((item) => {
+        doc.fontSize(10).font('Helvetica').text(item.product.name, leftX, yPos);
+        doc.text(item.product.sku, 250, yPos);
+        doc.text(`${item.quantity}`, 350, yPos, { align: 'center' });
+        doc.text(`$${item.unitPrice.toFixed(2)}`, 420, yPos, { align: 'right' });
+        doc.text(`$${item.subtotal.toFixed(2)}`, 490, yPos, { align: 'right' });
+        yPos += 15;
+      });
+
+      doc.moveTo(leftX, yPos).lineTo(rightX, yPos).stroke();
+      yPos += 20;
+
+      const payments = sale.payments;
+      const paymentTotalBs = payments.reduce((sum, p) => {
+        if (p.currency === 'BS') return sum + Number(p.amount);
+        if (usdToBsRateAtSale > 0) return sum + Number(p.amountUsd) * usdToBsRateAtSale;
+        return sum;
+      }, 0);
+
+      if (payments.length > 0) {
+        const PAYMENT_LABELS: Record<string, string> = {
+          EFECTIVO: 'Efectivo',
+          TRANSFERENCIA: 'Transferencia',
+          PUNTO_VENTA: 'Punto de Venta',
+          PAGO_MOVIL: 'Pago Móvil',
+          ZELLE: 'Zelle',
+        };
+
+        doc.fillColor(...PDFColors.primary).fontSize(12).font('Helvetica-Bold').text('PAGOS', leftX, yPos);
+        yPos += 15;
+
+        payments.forEach((p) => {
+          const label = PAYMENT_LABELS[p.paymentMethod] || p.paymentMethod;
+          const currencyLabel = p.currency === 'USD' ? 'USD' : 'Bs.';
+          const amountDisplay = p.currency === 'USD'
+            ? `$${Number(p.amountUsd).toFixed(2)}`
+            : `Bs. ${Number(p.amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`;
+          doc.fontSize(10).font('Helvetica').text(`${label} (${currencyLabel}): ${amountDisplay}`, leftX, yPos);
+          yPos += 15;
+        });
+        yPos += 10;
+      }
+
+      doc.fillColor(...PDFColors.primary).fontSize(12).font('Helvetica-Bold').text('RESUMEN', leftX, yPos);
+      yPos += 15;
+
+      const isBs = sale.currency === 'BS';
+      const totalValue = isBs
+        ? (paymentTotalBs > 0 ? `Bs. ${paymentTotalBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}` : `Bs. ${total.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`)
+        : `$${total.toFixed(2)}`;
+
+      doc.fontSize(10).font('Helvetica').text(`Subtotal:`, leftX, yPos);
+      doc.text(`$${total.toFixed(2)}`, rightX, yPos, { align: 'right' });
+      yPos += 20;
+
+      if (tax > 0) {
+        doc.fillColor(...PDFColors.amber).text(`IVA:`, leftX, yPos);
+        doc.text(`$${tax.toFixed(2)}`, rightX, yPos, { align: 'right' });
+        yPos += 20;
+      }
+
+      const totalBoxWidth = 100;
+      const totalBoxX = rightX - totalBoxWidth;
+      doc.rect(totalBoxX - 2, yPos - 3, totalBoxWidth + 4, 8).fill(...PDFColors.primaryDark);
+      doc.fillColor('white').fontSize(14).font('Helvetica-Bold').text(`TOTAL ${isBs ? 'Bs.' : 'USD'}:`, totalBoxX, yPos + 1, { align: 'right' });
+      doc.text(totalValue, rightX, yPos + 1, { align: 'right' });
+
+      yPos += 30;
+
+      if (sale.notes) {
+        doc.fillColor(...PDFColors.primaryLight).rect(leftX, yPos - 5, 460, 15, 'F');
+        doc.fillColor(...PDFColors.primaryDark).fontSize(10).font('Helvetica-Bold').text('Notas', leftX + 3, yPos + 1);
+        doc.fillColor(...PDFColors.grayText).fontSize(9).font('Helvetica').text(sale.notes, leftX + 3, yPos + 7, { maxWidth: 460 });
+        yPos += 25;
+      }
+
+      doc.text(`Este documento es una factura de control interno.`, leftX, yPos, { maxWidth: 460 });
+
+      doc.end();
+    });
   }
 }

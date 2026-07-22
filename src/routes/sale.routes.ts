@@ -16,6 +16,9 @@ router.get('/', SaleController.getAll);
 // GET /api/sales/:id
 router.get('/:id', SaleController.getById);
 
+// GET /api/sales/:id/invoice
+router.get('/:id/invoice', SaleController.downloadInvoice);
+
 // POST /api/sales
 router.post(
   '/',
